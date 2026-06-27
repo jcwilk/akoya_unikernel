@@ -19,21 +19,23 @@
 
 ## 4. QEMU runner and smoke test
 
-- [ ] 4.1 Require bridged `-netdev` on every `scripts/run-qemu.sh` invocation (headless and headful) with project-fixed guest MAC; remove user-mode/NAT/slirp run paths
-- [ ] 4.2 Fail fast when bridge/prerequisites are missing, with actionable error text
-- [ ] 4.3 Extend headless assertions to require bootstrap message, `net_ip=` line, and successful `net_ping=` line
-- [ ] 4.4 Increase default headless timeout for DHCP + connectivity probe
-- [ ] 4.5 Ensure `make test` always exercises the bridged always-network bootstrap (no separate `test-net` target unless documented as alias only)
+- [ ] 4.1 Require LAN-attached tap/macvtap netdev on every `scripts/run-qemu.sh` invocation (headless and headful) with project-fixed guest MAC; remove user-mode/NAT/slirp and bridge-enslavement run paths
+- [ ] 4.2 Add ephemeral macvtap setup/teardown helpers (libexec + scoped sudoers) on the designated wired interface only; never modify the wireless interface
+- [ ] 4.3 Fail fast when macvtap prerequisites or permissions are missing, with actionable error text
+- [ ] 4.4 Extend headless assertions to require bootstrap message, `net_ip=` line, and successful `net_ping=` line
+- [ ] 4.5 Increase default headless timeout for DHCP + connectivity probe
+- [ ] 4.6 Ensure `make test` always exercises the LAN-attached always-network bootstrap (no separate `test-net` target unless documented as alias only)
 
 ## 5. Documentation and workstation acceptance
 
-- [ ] 5.1 Update `README.md` with mandatory bridge setup, fixed MAC note, and expected console output for smoke test on all run modes
+- [ ] 5.1 Update `README.md` with macvtap setup, designated wired interface, fixed MAC note, and expected console output for smoke test on all run modes
 - [ ] 5.2 Document bare-metal Ethernet checklist (RJ-45, LAN DHCP, ICMP allowance) without automating deploy
-- [ ] 5.3 Run `make build && make test` on development workstation with bridged LAN; capture evidence (log path, pass/fail) for apply handoff
+- [ ] 5.3 Run `make build && make test` on development workstation; verify host network access remains usable before, during, and after the test; capture evidence (log path, pass/fail) for apply handoff
 
 ## Explicitly deferred
 
 - Bare-metal NIC driver for the Akoya EX controller (blocked until controller identity is confirmed on hardware or via Akoya EX–specific inventory source)
 - Wireless, DNS client, TCP/UDP, HTTP, and persistent socket APIs
-- CI/automation for bridged network tests in sandboxed environments
+- CI/automation for LAN-attached network tests in sandboxed environments
 - Hardware inventory updates inferring NIC controller part numbers without Akoya EX–specific corroboration
+- Linux bridge enslavement of host interfaces (rejected after prior apply disrupted workstation connectivity)

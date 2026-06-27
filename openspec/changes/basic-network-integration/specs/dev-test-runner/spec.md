@@ -4,14 +4,14 @@
 
 The project SHALL provide a single documented development-workstation entry point that runs a built boot image under emulation. The caller SHALL specify either headful or headless execution mode on every invocation; the entry point SHALL NOT assume a default mode when none is given.
 
-On every invocation, the entry point SHALL attach an emulated wired Ethernet interface bridged to the development workstation LAN so the guest performs real DHCP and IP traffic against the same router and network as the workstation.
+On every invocation, the entry point SHALL attach an emulated wired Ethernet interface directly to the development workstation LAN so the guest performs real DHCP and IP traffic against the same router and network as the workstation, without disrupting the host's own network connectivity.
 
 #### Scenario: Headless run after build
 
 - **GIVEN** a successful bootstrap build on the development workstation
 - **WHEN** the documented run entry point is invoked in headless mode
 - **THEN** the boot image starts under emulation without an interactive display
-- **AND** the guest wired interface is bridged to the workstation LAN
+- **AND** the guest wired interface is on the workstation LAN
 - **AND** the process exits with success when the expected bootstrap and network diagnostic output is observed
 
 #### Scenario: Headful run after build
@@ -19,7 +19,7 @@ On every invocation, the entry point SHALL attach an emulated wired Ethernet int
 - **GIVEN** a successful bootstrap build on the development workstation
 - **WHEN** the documented run entry point is invoked in headful mode
 - **THEN** the boot image starts under emulation with an interactive display on the development workstation
-- **AND** the guest wired interface is bridged to the workstation LAN
+- **AND** the guest wired interface is on the workstation LAN
 - **AND** console output remains available for observation
 
 #### Scenario: Missing display mode
@@ -102,24 +102,35 @@ When running the bootstrap image under emulation, the run entry point SHALL conf
 - **THEN** the guest uses the same MAC address in both runs
 - **AND** a DHCP server on the LAN can treat the guest as the same client across runs
 
-### Requirement: Bridged networking prerequisites
+### Requirement: Workstation LAN networking prerequisites
 
-The run entry point SHALL fail fast with an actionable error if bridged networking prerequisites on the workstation are not satisfied.
+The run entry point SHALL fail fast with an actionable error if LAN attachment prerequisites on the workstation are not satisfied.
 
-#### Scenario: Bridge unavailable
+#### Scenario: LAN attachment unavailable
 
-- **GIVEN** the configured bridge or permission prerequisites are missing
+- **GIVEN** the configured wired interface or permission prerequisites for LAN attachment are missing
 - **WHEN** the run entry point prepares emulation in either display mode
 - **THEN** it exits immediately with a non-zero status
 - **AND** the error explains what the operator must configure on the workstation
+
+### Requirement: Host connectivity preservation
+
+The run entry point SHALL preserve the development workstation's usable network access during ephemeral LAN attachment setup, the emulation session, and teardown.
+
+#### Scenario: Host remains online during test
+
+- **GIVEN** the workstation had usable network access before the run entry point started
+- **WHEN** the entry point completes setup, runs emulation, and tears down LAN attachment
+- **THEN** the workstation retains usable network access throughout
+- **AND** teardown restores the pre-test networking state for the designated wired interface
 
 ### Requirement: No isolated guest networking mode
 
 The run entry point SHALL NOT offer a run path that connects the guest to an isolated or NAT-only virtual network instead of the workstation LAN.
 
-#### Scenario: Bridging is mandatory
+#### Scenario: LAN attachment is mandatory
 
 - **GIVEN** a caller invokes the run entry point with valid arguments
 - **WHEN** emulation starts
-- **THEN** the guest wired interface is bridged to the workstation LAN
+- **THEN** the guest wired interface is on the workstation LAN
 - **AND** no alternative user-mode or NAT-only networking mode is selected
