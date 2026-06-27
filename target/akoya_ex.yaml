@@ -1,0 +1,156 @@
+# Medion Akoya EX — hardware inventory
+# Populated only from Akoya EX–confirmed sources; see target/akoya_ex/README.md
+
+identity:
+  marketing_name: Medion Akoya EX
+  medion_model_number: MD95335
+  internal_designation: MIM2060
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+    - offtek-md95335-memory-specs.md
+    - howtomendit-mim2060-ram-2010.md
+
+form_factor:
+  class: notebook
+  display_size_inches: 14.1
+  weight_lb: 5.1
+  dimensions_inches:
+    width: 13
+    depth: 9.9
+    height: 1.3
+  chassis: white plastic
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+cpu:
+  model: Intel Pentium M 735
+  codename: Dothan
+  cores: 1
+  clock_ghz: 1.7
+  l2_cache_mb: 2
+  fsb_mhz: 400
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+chipset:
+  model: Intel 855GM
+  integrated_graphics: Intel Extreme Graphics 2
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+memory:
+  default_installed_mb: 512
+  maximum_mb: 1024
+  slots: 2
+  module_size_max_mb: 512
+  type: DDR
+  form_factor: 200-pin SO-DIMM
+  speed: PC2700
+  speed_mhz: 333
+  voltage_v: 2.5
+  ecc: false
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+    - offtek-md95335-memory-specs.md
+    - howtomendit-mim2060-ram-2010.md
+
+display:
+  size_inches: 14.1
+  resolution: 1280x768
+  aspect: widescreen
+  panel_type: TFT
+  coating: glossy
+  brightness_levels: 16
+  external_outputs:
+    - VGA
+    - DVI-D
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+storage:
+  default:
+    capacity_gb: 80
+    rpm: 4200
+    model_observed_on_review_unit: SAMSUNG MP0804H
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+optical:
+  type: dual-layer DVD super multi drive
+  formats:
+    - DVD+R
+    - DVD+RW
+    - DVD-RAM
+    - CD-R
+    - CD-RW
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+expansion:
+  pcmcia: Type II
+  card_reader:
+    formats:
+      - SD
+      - MMC
+      - MS
+      - MS-PRO
+      - SM
+    implementation: PCMCIA card
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+audio:
+  bit_depth: 16
+  channels: stereo
+  speakers: 2
+  microphone: built-in
+  line_out_spdif: true
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+network:
+  ethernet:
+    speed: 10/100 Mbit
+  wireless:
+    adapter: Intel PRO/Wireless 2200BG
+    standards:
+      - 802.11b
+      - 802.11g
+  modem:
+    type: 56k V.90
+  bluetooth: false
+  irda: true
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+ports:
+  usb:
+    version: "2.0"
+    count: 3
+    placement: "2 rear, 1 left"
+  video:
+    - VGA
+    - DVI-D dual link
+  ieee1394: true
+  audio:
+    - microphone in
+    - line out
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+software_shipped:
+  operating_system: Microsoft Windows XP Home Edition SP2
+  bundled:
+    - Microsoft Works 8.0
+    - CyberLink PowerCinema Suite
+    - Ahead Nero Burning ROM with Nero Recode 2-SE
+    - Norton AntiVirus
+  recovery_partition_gb: 6
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
+
+market:
+  region_observed: North America
+  retailer_observed: Best Buy
+  sources:
+    - ryanbetz-notebookreview-review-2009-03-01.md
