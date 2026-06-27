@@ -3,7 +3,11 @@
 
 identity:
   marketing_name: Medion Akoya EX
+  medion_model_number: MD95335
+  best_buy_sku: "7134941"
+  upc: "845609001283"
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 form_factor:
@@ -16,6 +20,7 @@ form_factor:
     height: 1.3
   chassis: white plastic
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 cpu:
@@ -26,12 +31,15 @@ cpu:
   l2_cache_mb: 2
   fsb_mhz: 400
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 chipset:
   model: Intel 855GM
   integrated_graphics: Intel Extreme Graphics 2
+  video_memory_mb: 64
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 memory:
@@ -42,6 +50,7 @@ memory:
   type: DDR
   form_factor: SO-DIMM
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
     - intel-855gm-gmch-memory-capacity.md
 
@@ -56,6 +65,7 @@ display:
     - VGA
     - DVI-D
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 storage:
@@ -64,6 +74,7 @@ storage:
     rpm: 4200
     model_observed_on_review_unit: SAMSUNG MP0804H
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 optical:
@@ -75,6 +86,7 @@ optical:
     - CD-R
     - CD-RW
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 expansion:
@@ -88,6 +100,7 @@ expansion:
       - SM
     implementation: PCMCIA card
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 audio:
@@ -97,6 +110,7 @@ audio:
   microphone: built-in
   line_out_spdif: true
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 network:
@@ -112,6 +126,7 @@ network:
   bluetooth: false
   irda: true
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 ports:
@@ -127,7 +142,18 @@ ports:
     - microphone in
     - line out
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
+
+input:
+  pointing_device: touchpad
+  sources:
+    - bestbuy_medion_akoya_ex_specifications.md
+
+power:
+  battery_type: lithium-ion
+  sources:
+    - bestbuy_medion_akoya_ex_specifications.md
 
 software_shipped:
   operating_system: Microsoft Windows XP Home Edition SP2
@@ -138,10 +164,12 @@ software_shipped:
     - Norton AntiVirus
   recovery_partition_gb: 6
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
 
 market:
   region_observed: North America
   retailer_observed: Best Buy
   sources:
+    - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
