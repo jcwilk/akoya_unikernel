@@ -172,15 +172,14 @@ static void console_write_reply_truncated(const char *reply)
 
 static void emit_fail(const char *reason)
 {
-    console_write("chat_completion=fail reason=");
+    console_write("chat failed: ");
     console_write_line(reason);
 }
 
 static void emit_ok(const char *reply)
 {
-    console_write("chat_completion=ok reply=");
     console_write_reply_truncated(reply);
-    console_write_line("");
+    console_newline();
 }
 
 static void format_host_ip(char *host, int cap)
@@ -592,7 +591,7 @@ void http_chat_session(void)
     char reply[512];
 
     for (;;) {
-        console_write("chat>");
+        console_write_prompt("> ");
 
         int len = ps2_read_line(line, (int)sizeof(line));
         if (len <= 0) {

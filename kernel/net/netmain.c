@@ -9,21 +9,17 @@
 #include "net/link/link.h"
 #include "time/time.h"
 
-#ifndef AKOYA_PROBE_TARGET_IP0
-#define AKOYA_PROBE_TARGET_IP0 8
+#ifndef AKOYA_CHAT_HOST_IP0
+#define AKOYA_CHAT_HOST_IP0 192
 #endif
-#ifndef AKOYA_PROBE_TARGET_IP1
-#define AKOYA_PROBE_TARGET_IP1 8
+#ifndef AKOYA_CHAT_HOST_IP1
+#define AKOYA_CHAT_HOST_IP1 168
 #endif
-#ifndef AKOYA_PROBE_TARGET_IP2
-#define AKOYA_PROBE_TARGET_IP2 8
+#ifndef AKOYA_CHAT_HOST_IP2
+#define AKOYA_CHAT_HOST_IP2 1
 #endif
-#ifndef AKOYA_PROBE_TARGET_IP3
-#define AKOYA_PROBE_TARGET_IP3 8
-#endif
-
-#ifndef AKOYA_PROBE_TARGET_LABEL
-#define AKOYA_PROBE_TARGET_LABEL "8.8.8.8"
+#ifndef AKOYA_CHAT_HOST_IP3
+#define AKOYA_CHAT_HOST_IP3 110
 #endif
 
 static eth_device_t nic;
@@ -52,28 +48,6 @@ static void console_write_ipv4(ipv4_addr_t addr)
         if (octet < 3) {
             console_write(".");
         }
-    }
-}
-
-static void console_write_uint32(uint32_t value)
-{
-    char buffer[12];
-    int index = 0;
-
-    if (value == 0) {
-        console_write("0");
-        return;
-    }
-
-    while (value > 0 && index < (int)sizeof(buffer) - 1) {
-        buffer[index++] = (char)('0' + (value % 10U));
-        value /= 10U;
-    }
-
-    while (index > 0) {
-        index--;
-        char digit[2] = { buffer[index], '\0' };
-        console_write(digit);
     }
 }
 
@@ -136,26 +110,24 @@ void net_bootstrap(void)
     }
 
     ipv4_addr_t target;
-    target.bytes[0] = AKOYA_PROBE_TARGET_IP0;
-    target.bytes[1] = AKOYA_PROBE_TARGET_IP1;
-    target.bytes[2] = AKOYA_PROBE_TARGET_IP2;
-    target.bytes[3] = AKOYA_PROBE_TARGET_IP3;
+    target.bytes[0] = AKOYA_CHAT_HOST_IP0;
+    target.bytes[1] = AKOYA_CHAT_HOST_IP1;
+    target.bytes[2] = AKOYA_CHAT_HOST_IP2;
+    target.bytes[3] = AKOYA_CHAT_HOST_IP3;
+
+    console_clear();
 
     uint32_t rtt_ms = 0;
     icmp_status_t ping_status = icmp_ping(target, 30000U, &rtt_ms);
 
-    console_write("net_ping=");
-    console_write(AKOYA_PROBE_TARGET_LABEL);
-    console_write(" status=");
+    console_write_ipv4(target);
 
     if (ping_status == ICMP_OK) {
-        console_write("ok rtt_ms=");
-        console_write_uint32(rtt_ms);
-        console_write_line("");
+        console_write_line(" reachable");
         (void)http_chat_session();
     } else if (ping_status == ICMP_FAIL_UNREACHABLE) {
-        console_write_line("fail reason=unreachable");
+        console_write_line(" unreachable");
     } else {
-        console_write_line("fail reason=timeout");
+        console_write_line(" timeout");
     }
 }

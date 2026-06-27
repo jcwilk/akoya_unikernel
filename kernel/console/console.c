@@ -46,14 +46,36 @@ static void serial_write_char(char character)
     outb(COM1_PORT, (unsigned char)character);
 }
 
+static void vga_scroll_up(void)
+{
+    volatile unsigned short *vga = (volatile unsigned short *)VGA_MEMORY;
+
+    for (int row = 0; row < VGA_HEIGHT - 1; row++) {
+        for (int col = 0; col < VGA_WIDTH; col++) {
+            vga[row * VGA_WIDTH + col] = vga[(row + 1) * VGA_WIDTH + col];
+        }
+    }
+
+    for (int col = 0; col < VGA_WIDTH; col++) {
+        vga[(VGA_HEIGHT - 1) * VGA_WIDTH + col] =
+            (unsigned short)' ' | ((unsigned short)VGA_COLOR << 8);
+    }
+}
+
+static void vga_advance_row(void)
+{
+    vga_col = 0;
+    vga_row++;
+    if (vga_row >= VGA_HEIGHT) {
+        vga_scroll_up();
+        vga_row = VGA_HEIGHT - 1;
+    }
+}
+
 static void vga_put_char(char character)
 {
     if (character == '\n') {
-        vga_col = 0;
-        vga_row++;
-        if (vga_row >= VGA_HEIGHT) {
-            vga_row = VGA_HEIGHT - 1;
-        }
+        vga_advance_row();
         return;
     }
 
@@ -63,11 +85,7 @@ static void vga_put_char(char character)
 
     vga_col++;
     if (vga_col >= VGA_WIDTH) {
-        vga_col = 0;
-        vga_row++;
-        if (vga_row >= VGA_HEIGHT) {
-            vga_row = VGA_HEIGHT - 1;
-        }
+        vga_advance_row();
     }
 }
 
@@ -109,4 +127,33 @@ void console_backspace(void)
     serial_write_char('\b');
     serial_write_char(' ');
     serial_write_char('\b');
+}
+
+void console_newline(void)
+{
+    serial_write_char('\n');
+    vga_put_char('\n');
+}
+
+void console_write_prompt(const char *prompt)
+{
+    if (vga_col != 0) {
+        console_newline();
+    }
+    console_write(prompt);
+}
+
+void console_clear(void)
+{
+    volatile unsigned short *vga = (volatile unsigned short *)VGA_MEMORY;
+
+    for (int row = 0; row < VGA_HEIGHT; row++) {
+        for (int col = 0; col < VGA_WIDTH; col++) {
+            vga[row * VGA_WIDTH + col] =
+                (unsigned short)' ' | ((unsigned short)VGA_COLOR << 8);
+        }
+    }
+
+    vga_row = 0;
+    vga_col = 0;
 }

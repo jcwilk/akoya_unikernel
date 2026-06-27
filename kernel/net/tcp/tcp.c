@@ -225,9 +225,13 @@ tcp_status_t tcp_connect_send_recv(
     uint16_t *recv_len_out,
     uint32_t timeout_ms)
 {
+    for (int i = 0; i < 32; i++) {
+        link_poll();
+    }
+
     conn_remote_ip = dest;
     conn_remote_port = dest_port;
-    conn_local_port = (uint16_t)(49152U + (time_millis() & 0x0FFFU));
+    conn_local_port = (uint16_t)(49152U + ((time_millis() >> 4) & 0x0FFFU));
     conn_seq = time_millis();
     conn_ack = 0;
     conn_established = 0;

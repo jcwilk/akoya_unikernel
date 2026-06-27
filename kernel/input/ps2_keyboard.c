@@ -2,13 +2,43 @@
 
 #include "console/console.h"
 #include "io/io.h"
+#include "net/link/link.h"
 
 #define PS2_DATA_PORT   0x60
 #define PS2_STATUS_PORT 0x64
 #define PS2_STATUS_OUT  0x01
 
-static char scan_to_ascii(unsigned char scan_code)
+static int shift_active;
+
+static char scan_to_ascii(unsigned char scan_code, int shifted)
 {
+    if (shifted) {
+        switch (scan_code) {
+        case 0x02: return '!';
+        case 0x03: return '@';
+        case 0x04: return '#';
+        case 0x05: return '$';
+        case 0x06: return '%';
+        case 0x07: return '^';
+        case 0x08: return '&';
+        case 0x09: return '*';
+        case 0x0A: return '(';
+        case 0x0B: return ')';
+        case 0x0C: return '_';
+        case 0x0D: return '+';
+        case 0x1A: return '{';
+        case 0x1B: return '}';
+        case 0x27: return ':';
+        case 0x28: return '"';
+        case 0x29: return '~';
+        case 0x2B: return '|';
+        case 0x33: return '<';
+        case 0x34: return '>';
+        case 0x35: return '?';
+        default:   break;
+        }
+    }
+
     switch (scan_code) {
     case 0x02: return '1';
     case 0x03: return '2';
@@ -22,38 +52,38 @@ static char scan_to_ascii(unsigned char scan_code)
     case 0x0B: return '0';
     case 0x0C: return '-';
     case 0x0D: return '=';
-    case 0x10: return 'q';
-    case 0x11: return 'w';
-    case 0x12: return 'e';
-    case 0x13: return 'r';
-    case 0x14: return 't';
-    case 0x15: return 'y';
-    case 0x16: return 'u';
-    case 0x17: return 'i';
-    case 0x18: return 'o';
-    case 0x19: return 'p';
+    case 0x10: return shifted ? 'Q' : 'q';
+    case 0x11: return shifted ? 'W' : 'w';
+    case 0x12: return shifted ? 'E' : 'e';
+    case 0x13: return shifted ? 'R' : 'r';
+    case 0x14: return shifted ? 'T' : 't';
+    case 0x15: return shifted ? 'Y' : 'y';
+    case 0x16: return shifted ? 'U' : 'u';
+    case 0x17: return shifted ? 'I' : 'i';
+    case 0x18: return shifted ? 'O' : 'o';
+    case 0x19: return shifted ? 'P' : 'p';
     case 0x1A: return '[';
     case 0x1B: return ']';
-    case 0x1E: return 'a';
-    case 0x1F: return 's';
-    case 0x20: return 'd';
-    case 0x21: return 'f';
-    case 0x22: return 'g';
-    case 0x23: return 'h';
-    case 0x24: return 'j';
-    case 0x25: return 'k';
-    case 0x26: return 'l';
+    case 0x1E: return shifted ? 'A' : 'a';
+    case 0x1F: return shifted ? 'S' : 's';
+    case 0x20: return shifted ? 'D' : 'd';
+    case 0x21: return shifted ? 'F' : 'f';
+    case 0x22: return shifted ? 'G' : 'g';
+    case 0x23: return shifted ? 'H' : 'h';
+    case 0x24: return shifted ? 'J' : 'j';
+    case 0x25: return shifted ? 'K' : 'k';
+    case 0x26: return shifted ? 'L' : 'l';
     case 0x27: return ';';
     case 0x28: return '\'';
     case 0x29: return '`';
     case 0x2B: return '\\';
-    case 0x2C: return 'z';
-    case 0x2D: return 'x';
-    case 0x2E: return 'c';
-    case 0x2F: return 'v';
-    case 0x30: return 'b';
-    case 0x31: return 'n';
-    case 0x32: return 'm';
+    case 0x2C: return shifted ? 'Z' : 'z';
+    case 0x2D: return shifted ? 'X' : 'x';
+    case 0x2E: return shifted ? 'C' : 'c';
+    case 0x2F: return shifted ? 'V' : 'v';
+    case 0x30: return shifted ? 'B' : 'b';
+    case 0x31: return shifted ? 'N' : 'n';
+    case 0x32: return shifted ? 'M' : 'm';
     case 0x33: return ',';
     case 0x34: return '.';
     case 0x35: return '/';
@@ -80,15 +110,27 @@ static void ps2_drain_output(void)
 
 void ps2_keyboard_init(void)
 {
+    shift_active = 0;
     ps2_drain_output();
     outb(PS2_STATUS_PORT, 0xAE);
     ps2_wait_input();
     ps2_drain_output();
 }
 
+static int ps2_handle_modifier(unsigned char scan, int is_break)
+{
+    if (scan == 0x2A || scan == 0x36) {
+        shift_active = is_break ? 0 : 1;
+        return 1;
+    }
+    return 0;
+}
+
 static int ps2_read_scancode(unsigned char *scan_out)
 {
     for (;;) {
+        link_poll();
+
         if (inb(PS2_STATUS_PORT) & PS2_STATUS_OUT) {
             unsigned char scan = inb(PS2_DATA_PORT);
             if (scan == 0xE0) {
@@ -98,10 +140,19 @@ static int ps2_read_scancode(unsigned char *scan_out)
                 }
                 continue;
             }
-            if (scan & 0x80) {
+
+            int is_break = (scan & 0x80) != 0;
+            unsigned char make = (unsigned char)(scan & 0x7FU);
+
+            if (ps2_handle_modifier(make, is_break)) {
                 continue;
             }
-            *scan_out = scan;
+
+            if (is_break) {
+                continue;
+            }
+
+            *scan_out = make;
             return 0;
         }
     }
@@ -123,7 +174,7 @@ int ps2_read_line(char *buf, int cap)
         }
 
         if (scan == 0x1C) {
-            console_write_line("");
+            console_newline();
             return len;
         }
 
@@ -136,7 +187,7 @@ int ps2_read_line(char *buf, int cap)
             continue;
         }
 
-        char ch = scan_to_ascii(scan);
+        char ch = scan_to_ascii(scan, shift_active);
         if (ch == '\0') {
             continue;
         }

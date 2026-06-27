@@ -10,7 +10,7 @@ TIMEOUT_SEC="${AKOYA_QEMU_TIMEOUT_SEC:-300}"
 BOOT_MESSAGE="${AKOYA_BOOTSTRAP_MESSAGE:-akoya_unikernel bootstrap ok}"
 CHAT_HOST="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
 CHAT_PORT="${AKOYA_CHAT_PORT:-11435}"
-DEFAULT_CHAT_SCRIPT="h i ret q u i t ret"
+DEFAULT_CHAT_SCRIPT="h i ret w h a t ret q u i t ret"
 CHAT_SCRIPT="${AKOYA_CHAT_SCRIPT:-${DEFAULT_CHAT_SCRIPT}}"
 MONITOR_SOCK="${BUILD_DIR}/qemu-monitor.sock"
 GUEST_MAC="${AKOYA_QEMU_GUEST_MAC:-52:54:00:12:34:56}"
@@ -46,7 +46,7 @@ Environment:
   AKOYA_QEMU_TIMEOUT_SEC  Headless timeout (default: 300)
   AKOYA_CHAT_HOST_IP       Chat endpoint host for pre-flight (default: 192.168.1.110)
   AKOYA_CHAT_PORT          Chat endpoint port for pre-flight (default: 11435)
-  AKOYA_CHAT_SCRIPT        Space-separated QEMU sendkey names for headless chat (default: h i ret q u i t ret)
+  AKOYA_CHAT_SCRIPT        Space-separated QEMU sendkey names for headless chat (default: h i ret w h a t ret q u i t ret)
   AKOYA_AUTO_LAN          1 = macvtap up/down around each run (default: 1)
   AKOYA_LAN_LIBEXEC       Installed helper scripts for passwordless sudo (default: /usr/local/libexec/akoya)
 
@@ -118,11 +118,21 @@ inject_chat_script() {
     fi
 
     waited=0
-    while ! grep -Fq "chat>" "${LOG_FILE}" && [[ ${waited} -lt 600 ]]; do
+    while ! grep -Fq "${CHAT_HOST} reachable" "${LOG_FILE}" && [[ ${waited} -lt 600 ]]; do
         sleep 0.5
         waited=$((waited + 1))
     done
-    if ! grep -Fq "chat>" "${LOG_FILE}"; then
+    if ! grep -Fq "${CHAT_HOST} reachable" "${LOG_FILE}"; then
+        echo "run-qemu.sh: reachability line not observed before keyboard injection" >&2
+        return 1
+    fi
+
+    waited=0
+    while ! grep -Fq "> " "${LOG_FILE}" && [[ ${waited} -lt 600 ]]; do
+        sleep 0.5
+        waited=$((waited + 1))
+    done
+    if ! grep -Fq "> " "${LOG_FILE}"; then
         echo "run-qemu.sh: chat prompt not observed before keyboard injection" >&2
         return 1
     fi
@@ -131,9 +141,48 @@ inject_chat_script() {
     local key
     for key in ${CHAT_SCRIPT}; do
         send_monitor_command "sendkey ${key}" || return 1
-        sleep 0.05
+        if [[ "${key}" == "ret" ]]; then
+            local start_lines
+            start_lines="$(wc -l < "${LOG_FILE}")"
+            local turn_waited=0
+            while [[ ${turn_waited} -lt 240 ]]; do
+                if grep -Fq "chat_session=exit" "${LOG_FILE}"; then
+                    break
+                fi
+                local now_lines
+                now_lines="$(wc -l < "${LOG_FILE}")"
+                if [[ ${now_lines} -gt ${start_lines} ]]; then
+                    sleep 0.5
+                    break
+                fi
+                sleep 0.25
+                turn_waited=$((turn_waited + 1))
+            done
+            sleep 0.5
+        else
+            sleep 0.05
+        fi
     done
     return 0
+}
+
+count_plain_reply_lines() {
+    awk -v host="${CHAT_HOST}" '
+        $0 ~ ("^" host " reachable$") { found = 1; next }
+        !found { next }
+        /^> / { next }
+        /^chat_session=/ { next }
+        /^chat failed:/ { next }
+        /^net_/ { next }
+        /^run-qemu\.sh:/ { next }
+        /^Running QEMU/ { next }
+        /^Boot image:/ { next }
+        /^LAN:/ { next }
+        /^QEMU smoke test/ { next }
+        /^$/ { next }
+        { count++ }
+        END { print count + 0 }
+    ' "${LOG_FILE}"
 }
 
 lan_script_path() {
@@ -474,21 +523,30 @@ main() {
         fail "expected net_ip= line not found in captured output"
     fi
 
-    if ! grep -Eq '^net_ping=.* status=ok rtt_ms=[0-9]+$' "${LOG_FILE}"; then
-        fail "expected successful net_ping= line not found in captured output"
+    if ! grep -Fq "${CHAT_HOST} reachable" "${LOG_FILE}"; then
+        fail "expected ${CHAT_HOST} reachable line not found in captured output"
+    fi
+
+    if grep -qE '^chat_completion=' "${LOG_FILE}"; then
+        fail "old chat_completion= diagnostic framing detected in captured output"
     fi
 
     local chat_assert=0
     if chat_endpoint_reachable; then
         chat_assert=1
-        echo "run-qemu.sh: chat endpoint ${CHAT_HOST}:${CHAT_PORT} reachable; asserting chat_completion=ok" | tee -a "${LOG_FILE}"
+        echo "run-qemu.sh: chat endpoint ${CHAT_HOST}:${CHAT_PORT} reachable; asserting plain assistant replies" | tee -a "${LOG_FILE}"
     else
-        echo "run-qemu.sh: WARNING: chat endpoint ${CHAT_HOST}:${CHAT_PORT} unreachable from host; skipping chat_completion assertions" | tee -a "${LOG_FILE}"
+        echo "run-qemu.sh: WARNING: chat endpoint ${CHAT_HOST}:${CHAT_PORT} unreachable from host; skipping chat reply assertions" | tee -a "${LOG_FILE}"
     fi
 
     if [[ "${chat_assert}" -eq 1 ]]; then
-        if ! grep -Eq '^chat_completion=ok reply=.+$' "${LOG_FILE}"; then
-            fail "expected chat_completion=ok with non-empty reply not found in captured output"
+        local reply_count
+        reply_count="$(count_plain_reply_lines)"
+        if [[ "${reply_count}" -lt 2 ]]; then
+            fail "expected at least 2 plain assistant reply lines (multi-turn), got ${reply_count}"
+        fi
+        if grep -q '^chat failed:' "${LOG_FILE}"; then
+            fail "chat failed detected during multi-turn session"
         fi
     fi
 
