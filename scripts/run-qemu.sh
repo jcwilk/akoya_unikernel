@@ -6,10 +6,13 @@ BUILD_DIR="${ROOT_DIR}/build"
 LOG_FILE="${BUILD_DIR}/qemu-smoke.log"
 
 QEMU_BIN="${AKOYA_QEMU_BIN:-qemu-system-i386}"
-TIMEOUT_SEC="${AKOYA_QEMU_TIMEOUT_SEC:-180}"
+TIMEOUT_SEC="${AKOYA_QEMU_TIMEOUT_SEC:-300}"
 BOOT_MESSAGE="${AKOYA_BOOTSTRAP_MESSAGE:-akoya_unikernel bootstrap ok}"
 CHAT_HOST="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
 CHAT_PORT="${AKOYA_CHAT_PORT:-11435}"
+DEFAULT_CHAT_SCRIPT="h i ret q u i t ret"
+CHAT_SCRIPT="${AKOYA_CHAT_SCRIPT:-${DEFAULT_CHAT_SCRIPT}}"
+MONITOR_SOCK="${BUILD_DIR}/qemu-monitor.sock"
 GUEST_MAC="${AKOYA_QEMU_GUEST_MAC:-52:54:00:12:34:56}"
 MACVTAP_IF="${AKOYA_QEMU_TAP_IF:-akoya-qemu0}"
 LAN_IF="${AKOYA_QEMU_LAN_IF:-enx00e04c6801e8}"
@@ -40,9 +43,10 @@ with fixed guest MAC ${GUEST_MAC}.
 Environment:
   AKOYA_QEMU_LAN_IF       Wired interface for macvtap parent (default: enx00e04c6801e8)
   AKOYA_QEMU_GUEST_MAC    Fixed guest MAC (default: 52:54:00:12:34:56)
-  AKOYA_QEMU_TIMEOUT_SEC  Headless timeout (default: 180)
+  AKOYA_QEMU_TIMEOUT_SEC  Headless timeout (default: 300)
   AKOYA_CHAT_HOST_IP       Chat endpoint host for pre-flight (default: 192.168.1.110)
   AKOYA_CHAT_PORT          Chat endpoint port for pre-flight (default: 11435)
+  AKOYA_CHAT_SCRIPT        Space-separated QEMU sendkey names for headless chat (default: h i ret q u i t ret)
   AKOYA_AUTO_LAN          1 = macvtap up/down around each run (default: 1)
   AKOYA_LAN_LIBEXEC       Installed helper scripts for passwordless sudo (default: /usr/local/libexec/akoya)
 
@@ -67,6 +71,69 @@ chat_endpoint_reachable() {
         return $?
     fi
     return 1
+}
+
+send_monitor_command() {
+    local cmd="$1"
+
+    if command -v socat >/dev/null 2>&1; then
+        printf '%s\n' "${cmd}" | socat - "UNIX-CONNECT:${MONITOR_SOCK}" >/dev/null 2>&1
+        return $?
+    fi
+
+    if command -v nc >/dev/null 2>&1; then
+        printf '%s\n' "${cmd}" | nc -U "${MONITOR_SOCK}" >/dev/null 2>&1
+        return $?
+    fi
+
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - "${cmd}" "${MONITOR_SOCK}" <<'PY'
+import socket
+import sys
+
+cmd = sys.argv[1]
+sock_path = sys.argv[2]
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.settimeout(2)
+s.connect(sock_path)
+s.sendall((cmd + "\n").encode())
+s.close()
+PY
+        return $?
+    fi
+
+    return 1
+}
+
+inject_chat_script() {
+    local waited=0
+
+    while [[ ! -S "${MONITOR_SOCK}" && ${waited} -lt 240 ]]; do
+        sleep 0.25
+        waited=$((waited + 1))
+    done
+    if [[ ! -S "${MONITOR_SOCK}" ]]; then
+        echo "run-qemu.sh: monitor socket not ready for keyboard injection" >&2
+        return 1
+    fi
+
+    waited=0
+    while ! grep -Fq "chat>" "${LOG_FILE}" && [[ ${waited} -lt 600 ]]; do
+        sleep 0.5
+        waited=$((waited + 1))
+    done
+    if ! grep -Fq "chat>" "${LOG_FILE}"; then
+        echo "run-qemu.sh: chat prompt not observed before keyboard injection" >&2
+        return 1
+    fi
+
+    sleep 0.5
+    local key
+    for key in ${CHAT_SCRIPT}; do
+        send_monitor_command "sendkey ${key}" || return 1
+        sleep 0.05
+    done
+    return 0
 }
 
 lan_script_path() {
@@ -319,16 +386,16 @@ main() {
     if [[ "${MODE}" == "headful" ]]; then
         display_args=(-display sdl)
         if [[ "${EXIT_ON_GUEST_DONE}" -eq 0 ]]; then
-            echo "Running QEMU headfully (guest will halt; close the window or Ctrl+C when done)" | tee -a "${LOG_FILE}"
+            echo "Running QEMU headfully (SDL keyboard uses emulated i8042 PS/2 path; close window or Ctrl+C when done)" | tee -a "${LOG_FILE}"
         else
-            echo "Running QEMU headfully" | tee -a "${LOG_FILE}"
+            echo "Running QEMU headfully (SDL keyboard uses emulated i8042 PS/2 path)" | tee -a "${LOG_FILE}"
         fi
         run_timeout=()
     else
         if [[ "${EXIT_ON_GUEST_DONE}" -eq 0 ]]; then
             echo "Running QEMU headless with --hold (no auto-exit on guest shutdown)" | tee -a "${LOG_FILE}"
         else
-            echo "Running QEMU headless smoke test (timeout ${TIMEOUT_SEC}s)" | tee -a "${LOG_FILE}"
+            echo "Running QEMU headless smoke test (timeout ${TIMEOUT_SEC}s, keyboard script: ${CHAT_SCRIPT})" | tee -a "${LOG_FILE}"
         fi
     fi
 
@@ -362,6 +429,15 @@ main() {
     if [[ "${EXIT_ON_GUEST_DONE}" -eq 1 ]]; then
         qemu_args+=(-device isa-debug-exit,iobase=0xf4,iosize=0x04)
     fi
+
+    local inject_pid=""
+    if [[ "${MODE}" == "headless" ]]; then
+        rm -f "${MONITOR_SOCK}"
+        qemu_args+=(-monitor "unix:${MONITOR_SOCK},server,nowait")
+        inject_chat_script &
+        inject_pid=$!
+    fi
+
     qemu_args+=(-kernel "${kernel_image}")
 
     set +e
@@ -372,6 +448,9 @@ main() {
     fi
     local qemu_status=${PIPESTATUS[0]}
     exec 3>&- 2>/dev/null || true
+    if [[ -n "${inject_pid}" ]]; then
+        wait "${inject_pid}" 2>/dev/null || true
+    fi
     set -e
 
     if [[ "${MODE}" == "headful" ]]; then

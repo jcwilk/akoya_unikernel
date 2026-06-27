@@ -10,9 +10,10 @@ typedef enum {
     HTTP_CHAT_FAIL_CONNECT,
     HTTP_CHAT_FAIL_TIMEOUT,
     HTTP_CHAT_FAIL_HTTP,
-    HTTP_CHAT_FAIL_PARSE
+    HTTP_CHAT_FAIL_PARSE,
+    HTTP_CHAT_FAIL_OVERFLOW
 } http_chat_status_t;
 
-http_chat_status_t http_chat_probe(void);
+void http_chat_session(void);
 
 #endif

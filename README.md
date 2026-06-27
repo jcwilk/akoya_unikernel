@@ -43,7 +43,7 @@ make clean    # remove build/ artifacts
 
 ### Expected console output (smoke test)
 
-The bootstrap kernel always prints the initial message, then network diagnostics with stable tokens for automation:
+The bootstrap kernel always prints the initial message, then network diagnostics with stable tokens for automation. After a successful ping, an interactive chat session starts on the integrated PS/2 keyboard path:
 
 ```
 akoya_unikernel bootstrap ok
@@ -51,10 +51,23 @@ build_id=<git-id>
 net_link=ok
 net_ip=192.168.1.42
 net_ping=google.com status=ok rtt_ms=12
+chat>hi
 chat_completion=ok reply=Hello!
+chat>quit
+chat_session=exit
 ```
 
-When the configured chat endpoint (`192.168.1.110:11435` by default) is unreachable, you may see `chat_completion=fail reason=connect|timeout|http|parse` instead.
+When the configured chat endpoint (`192.168.1.110:11435` by default) is unreachable, you may see `chat_completion=fail reason=connect|timeout|http|parse|overflow` instead.
+
+### Interactive chat session
+
+After network diagnostics succeed, the kernel enters a REPL-style chat loop:
+
+- **Input:** US-layout integrated keyboard via the i8042 PS/2 controller (the standard built-in keyboard path on Pentium M / ICH-era notebooks including the Akoya EX). In QEMU, headful SDL typing and headless `sendkey` injection both use this same emulated PS/2 path—not serial stdin.
+- **Line editing:** Printable ASCII is echoed; Backspace removes the last character; Enter submits the line. Empty lines are ignored.
+- **Exit:** Type `quit` or `exit` (case-insensitive) to end the session without sending inference.
+- **History:** Up to 16 turns (~8 KB JSON budget) of user and assistant messages are retained in memory and included in each chat-completion request.
+- **Headless automation:** `make test` injects a default keyboard script (`hi` + Enter + `quit` + Enter) via the QEMU monitor. Override with `AKOYA_CHAT_SCRIPT` (space-separated QEMU `sendkey` names, e.g. `h i ret q u i t ret`).
 
 Headless `make test` asserts:
 
@@ -122,7 +135,7 @@ bash scripts/run-qemu.sh --headless --image build/kernel.elf
 | `AKOYA_PROBE_HOST` | `google.com` | Hostname resolved at build time for ICMP probe (no DNS in guest) |
 | `AKOYA_CHAT_HOST_IP` | `192.168.1.110` | IPv4 address for chat-completion HTTP probe |
 | `AKOYA_CHAT_PATH` | `/v1/chat/completions` | HTTP path for chat-completion probe |
-| `AKOYA_CHAT_USER_MSG` | `hi` | User message in chat-completion JSON body |
+| `AKOYA_CHAT_USER_MSG` | `hi` | Legacy build-time default (interactive session uses keyboard input) |
 | `AKOYA_CHAT_MODEL` | `fast-text-qwen3-8b` | Model string in chat-completion JSON body |
 | `AKOYA_CHAT_PORT` | `11435` | TCP port for chat-completion HTTP probe |
 | `AKOYA_CHAT_TIMEOUT_MS` | `60000` | Total timeout for chat HTTP exchange (ms) |
@@ -133,7 +146,7 @@ Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `buil
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `AKOYA_QEMU_TIMEOUT_SEC` | `180` | Max seconds before headless smoke test fails |
+| `AKOYA_QEMU_TIMEOUT_SEC` | `300` | Max seconds before headless smoke test fails |
 | `AKOYA_BOOTSTRAP_MESSAGE` | `akoya_unikernel bootstrap ok` | Expected bootstrap console line |
 | `AKOYA_QEMU_LAN_IF` | `enx00e04c6801e8` | Wired interface for macvtap parent |
 | `AKOYA_QEMU_GUEST_MAC` | `52:54:00:12:34:56` | Fixed guest MAC (when libexec pins macvtap) |
@@ -142,6 +155,7 @@ Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `buil
 | `AKOYA_LAN_LIBEXEC` | `/usr/local/libexec/akoya` | Installed helper scripts for passwordless sudo |
 | `AKOYA_CHAT_HOST_IP` | `192.168.1.110` | Chat endpoint host for pre-flight reachability check |
 | `AKOYA_CHAT_PORT` | `11435` | Chat endpoint port for pre-flight reachability check |
+| `AKOYA_CHAT_SCRIPT` | `h i ret q u i t ret` | Headless QEMU monitor sendkey sequence for automated chat input |
 
 ## Bare-metal boot (manual)
 

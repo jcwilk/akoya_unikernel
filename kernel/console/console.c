@@ -92,3 +92,21 @@ void console_write_line(const char *message)
     serial_write_char('\n');
     vga_put_char('\n');
 }
+
+void console_backspace(void)
+{
+    if (vga_col > 0) {
+        vga_col--;
+    } else if (vga_row > 0) {
+        vga_row--;
+        vga_col = VGA_WIDTH - 1;
+    }
+
+    const unsigned int index = (unsigned int)(vga_row * VGA_WIDTH + vga_col);
+    volatile unsigned short *vga = (volatile unsigned short *)VGA_MEMORY;
+    vga[index] = (unsigned short)' ' | ((unsigned short)VGA_COLOR << 8);
+
+    serial_write_char('\b');
+    serial_write_char(' ');
+    serial_write_char('\b');
+}

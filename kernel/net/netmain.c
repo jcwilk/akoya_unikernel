@@ -152,7 +152,7 @@ void net_bootstrap(void)
         console_write("ok rtt_ms=");
         console_write_uint32(rtt_ms);
         console_write_line("");
-        (void)http_chat_probe();
+        (void)http_chat_session();
     } else if (ping_status == ICMP_FAIL_UNREACHABLE) {
         console_write_line("fail reason=unreachable");
     } else {

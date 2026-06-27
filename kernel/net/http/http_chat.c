@@ -1,6 +1,7 @@
 #include "net/http/http_chat.h"
 
 #include "console/console.h"
+#include "input/ps2_keyboard.h"
 #include "net/tcp/tcp.h"
 
 #ifndef AKOYA_CHAT_HOST_IP0
@@ -20,10 +21,6 @@
 #define AKOYA_CHAT_PATH "/v1/chat/completions"
 #endif
 
-#ifndef AKOYA_CHAT_USER_MSG
-#define AKOYA_CHAT_USER_MSG "hi"
-#endif
-
 #ifndef AKOYA_CHAT_MODEL
 #define AKOYA_CHAT_MODEL "fast-text-qwen3-8b"
 #endif
@@ -38,6 +35,20 @@
 
 #define HTTP_CHAT_RECV_CAP 4096U
 #define HTTP_CHAT_REPLY_CONSOLE_MAX 256U
+#define CHAT_MSG_MAX_LEN 128U
+#define CHAT_HISTORY_MAX_TURNS 16U
+#define CHAT_JSON_BUDGET 8192U
+
+typedef struct {
+    char user[CHAT_MSG_MAX_LEN];
+    char assistant[CHAT_MSG_MAX_LEN];
+    int has_assistant;
+} chat_turn_t;
+
+typedef struct {
+    chat_turn_t turns[CHAT_HISTORY_MAX_TURNS];
+    int count;
+} chat_history_t;
 
 static int find_substr(const char *haystack, int hay_len, const char *needle)
 {
@@ -212,25 +223,205 @@ static void format_host_ip(char *host, int cap)
     }
 }
 
-static int build_request(char *buf, int cap, int *len_out)
+static int str_len(const char *s)
 {
-    char json[256];
-    int json_len = 0;
-    const char *prefix = "{\"model\":\"";
-    const char *mid = "\",\"messages\":[{\"role\":\"user\",\"content\":\"";
-    const char *suffix = "\"}]}";
+    int len = 0;
+    while (s[len] != '\0') {
+        len++;
+    }
+    return len;
+}
 
-    const char *parts[] = { prefix, AKOYA_CHAT_MODEL, mid, AKOYA_CHAT_USER_MSG, suffix, 0 };
-    for (int p = 0; parts[p] != 0; p++) {
-        for (const char *s = parts[p]; *s != '\0'; s++) {
-            if (json_len + 1 >= (int)sizeof(json)) {
+static int str_eq_ci(const char *a, const char *b)
+{
+    while (*a != '\0' && *b != '\0') {
+        char ca = *a;
+        char cb = *b;
+        if (ca >= 'A' && ca <= 'Z') {
+            ca = (char)(ca + ('a' - 'A'));
+        }
+        if (cb >= 'A' && cb <= 'Z') {
+            cb = (char)(cb + ('a' - 'A'));
+        }
+        if (ca != cb) {
+            return 0;
+        }
+        a++;
+        b++;
+    }
+    return *a == '\0' && *b == '\0';
+}
+
+static int is_exit_command(const char *line)
+{
+    return str_eq_ci(line, "quit") || str_eq_ci(line, "exit");
+}
+
+static void chat_history_init(chat_history_t *history)
+{
+    history->count = 0;
+}
+
+static int chat_history_add_user(chat_history_t *history, const char *msg)
+{
+    if (history->count >= (int)CHAT_HISTORY_MAX_TURNS) {
+        return -1;
+    }
+
+    chat_turn_t *turn = &history->turns[history->count];
+    int i = 0;
+    while (msg[i] != '\0' && i < (int)CHAT_MSG_MAX_LEN - 1) {
+        turn->user[i] = msg[i];
+        i++;
+    }
+    turn->user[i] = '\0';
+    turn->assistant[0] = '\0';
+    turn->has_assistant = 0;
+    history->count++;
+    return 0;
+}
+
+static void chat_history_set_assistant(chat_history_t *history, const char *reply)
+{
+    if (history->count <= 0) {
+        return;
+    }
+
+    chat_turn_t *turn = &history->turns[history->count - 1];
+    int i = 0;
+    while (reply[i] != '\0' && i < (int)CHAT_MSG_MAX_LEN - 1) {
+        turn->assistant[i] = reply[i];
+        i++;
+    }
+    turn->assistant[i] = '\0';
+    turn->has_assistant = 1;
+}
+
+static int json_append_escaped(char *buf, int cap, int *pos, const char *text)
+{
+    for (int i = 0; text[i] != '\0'; i++) {
+        char c = text[i];
+        if (c == '"' || c == '\\') {
+            if (*pos + 2 >= cap) {
                 return -1;
             }
-            json[json_len++] = *s;
+            buf[(*pos)++] = '\\';
+            buf[(*pos)++] = c;
+        } else if (c >= 32 && c <= 126) {
+            if (*pos + 1 >= cap) {
+                return -1;
+            }
+            buf[(*pos)++] = c;
         }
     }
-    json[json_len] = '\0';
+    return 0;
+}
 
+static int estimate_json_size(const chat_history_t *history)
+{
+    int size = 32 + str_len(AKOYA_CHAT_MODEL);
+    for (int t = 0; t < history->count; t++) {
+        size += 32 + str_len(history->turns[t].user);
+        if (history->turns[t].has_assistant) {
+            size += 32 + str_len(history->turns[t].assistant);
+        }
+    }
+    return size;
+}
+
+static int chat_history_would_overflow(const chat_history_t *history, const char *new_user_msg)
+{
+    if (history->count >= (int)CHAT_HISTORY_MAX_TURNS) {
+        return 1;
+    }
+
+    int projected = estimate_json_size(history) + 32 + str_len(new_user_msg);
+    return projected >= (int)CHAT_JSON_BUDGET;
+}
+
+static int build_messages_json(const chat_history_t *history, char *json, int cap)
+{
+    int pos = 0;
+    const char *prefix = "{\"model\":\"";
+    const char *mid = "\",\"messages\":[";
+
+    for (const char *p = prefix; *p != '\0'; p++) {
+        if (pos + 1 >= cap) {
+            return -1;
+        }
+        json[pos++] = *p;
+    }
+    for (const char *p = AKOYA_CHAT_MODEL; *p != '\0'; p++) {
+        if (pos + 1 >= cap) {
+            return -1;
+        }
+        json[pos++] = *p;
+    }
+    for (const char *p = mid; *p != '\0'; p++) {
+        if (pos + 1 >= cap) {
+            return -1;
+        }
+        json[pos++] = *p;
+    }
+
+    for (int t = 0; t < history->count; t++) {
+        if (t > 0) {
+            if (pos + 1 >= cap) {
+                return -1;
+            }
+            json[pos++] = ',';
+        }
+
+        const char *user_prefix = "{\"role\":\"user\",\"content\":\"";
+        for (const char *p = user_prefix; *p != '\0'; p++) {
+            if (pos + 1 >= cap) {
+                return -1;
+            }
+            json[pos++] = *p;
+        }
+        if (json_append_escaped(json, cap, &pos, history->turns[t].user) != 0) {
+            return -1;
+        }
+        if (pos + 2 >= cap) {
+            return -1;
+        }
+        json[pos++] = '"';
+        json[pos++] = '}';
+
+        if (history->turns[t].has_assistant) {
+            if (pos + 1 >= cap) {
+                return -1;
+            }
+            json[pos++] = ',';
+            const char *asst_prefix = "{\"role\":\"assistant\",\"content\":\"";
+            for (const char *p = asst_prefix; *p != '\0'; p++) {
+                if (pos + 1 >= cap) {
+                    return -1;
+                }
+                json[pos++] = *p;
+            }
+            if (json_append_escaped(json, cap, &pos, history->turns[t].assistant) != 0) {
+                return -1;
+            }
+            if (pos + 2 >= cap) {
+                return -1;
+            }
+            json[pos++] = '"';
+            json[pos++] = '}';
+        }
+    }
+
+    if (pos + 2 >= cap) {
+        return -1;
+    }
+    json[pos++] = ']';
+    json[pos++] = '}';
+    json[pos] = '\0';
+    return pos;
+}
+
+static int build_request(const char *json, int json_len, char *buf, int cap, int *len_out)
+{
     char host[24];
     format_host_ip(host, (int)sizeof(host));
     if (AKOYA_CHAT_PORT != 80) {
@@ -319,11 +510,18 @@ static const char *tcp_fail_reason(tcp_status_t status)
     return "connect";
 }
 
-http_chat_status_t http_chat_probe(void)
+static http_chat_status_t http_chat_exchange(chat_history_t *history, char *reply, int reply_cap)
 {
-    char request[512];
+    static char json[CHAT_JSON_BUDGET];
+    int json_len = build_messages_json(history, json, (int)sizeof(json));
+    if (json_len < 0) {
+        emit_fail("overflow");
+        return HTTP_CHAT_FAIL_OVERFLOW;
+    }
+
+    static char request[512 + CHAT_JSON_BUDGET];
     int request_len = 0;
-    if (build_request(request, (int)sizeof(request), &request_len) != 0) {
+    if (build_request(json, json_len, request, (int)sizeof(request), &request_len) != 0) {
         emit_fail("parse");
         return HTTP_CHAT_FAIL_PARSE;
     }
@@ -373,13 +571,52 @@ http_chat_status_t http_chat_probe(void)
         return HTTP_CHAT_FAIL_PARSE;
     }
 
-    char reply[512];
     int body_len = (int)response_len - body_start;
-    if (extract_json_content((const char *)response + body_start, body_len, reply, (int)sizeof(reply)) < 0) {
+    if (extract_json_content((const char *)response + body_start, body_len, reply, reply_cap) < 0) {
         emit_fail("parse");
         return HTTP_CHAT_FAIL_PARSE;
     }
 
     emit_ok(reply);
     return HTTP_CHAT_OK;
+}
+
+void http_chat_session(void)
+{
+    chat_history_t history;
+    chat_history_init(&history);
+
+    ps2_keyboard_init();
+
+    char line[PS2_LINE_MAX];
+    char reply[512];
+
+    for (;;) {
+        console_write("chat>");
+
+        int len = ps2_read_line(line, (int)sizeof(line));
+        if (len <= 0) {
+            continue;
+        }
+
+        if (is_exit_command(line)) {
+            console_write_line("chat_session=exit");
+            break;
+        }
+
+        if (chat_history_would_overflow(&history, line)) {
+            emit_fail("overflow");
+            continue;
+        }
+
+        if (chat_history_add_user(&history, line) != 0) {
+            emit_fail("overflow");
+            continue;
+        }
+
+        http_chat_status_t status = http_chat_exchange(&history, reply, (int)sizeof(reply));
+        if (status == HTTP_CHAT_OK) {
+            chat_history_set_assistant(&history, reply);
+        }
+    }
 }
