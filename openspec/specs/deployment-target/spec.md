@@ -35,7 +35,7 @@ Boot images SHALL be compatible with i686-class 32-bit x86 execution and SHALL N
 
 ### Requirement: Conservative hardware assumptions
 
-Boot images in this change SHALL assume modest single-core resources comparable to a legacy notebook (on the order of two gigabytes system RAM). Bootstrap images SHALL require wired Ethernet and basic IPv4 connectivity via DHCP to complete their declared diagnostic behavior on target-class hardware.
+Boot images in this change SHALL assume modest single-core resources comparable to a legacy notebook (on the order of two gigabytes system RAM). Bootstrap images SHALL require wired Ethernet and basic IPv4 connectivity via DHCP to complete their declared diagnostic behavior on target-class hardware. Interactive chat on bare metal SHALL use the notebook integrated keyboard as the operator input device.
 
 #### Scenario: Network bootstrap uses wired Ethernet only
 
@@ -48,8 +48,15 @@ Boot images in this change SHALL assume modest single-core resources comparable 
 
 - **GIVEN** a bootstrap image built for the Akoya profile
 - **WHEN** it boots on target-class hardware
-- **THEN** it requires basic boot, console output, and wired Ethernet with DHCP reachability to complete its full diagnostic behavior
-- **AND** it does not require discrete GPU drivers or multi-core scheduling beyond what the network diagnostics need
+- **THEN** it requires basic boot, console output, wired Ethernet with DHCP reachability, and integrated keyboard input to complete its full interactive chat behavior
+- **AND** it does not require discrete GPU drivers or multi-core scheduling beyond what the network and chat session need
+
+#### Scenario: Integrated keyboard for interactive chat
+
+- **GIVEN** a bootstrap image built for the Akoya profile
+- **WHEN** an operator uses interactive chat on bare metal
+- **THEN** input is accepted from the notebook integrated keyboard
+- **AND** external USB keyboards or serial terminals are not required for typing
 
 ### Requirement: Deployment target hardware documentation
 

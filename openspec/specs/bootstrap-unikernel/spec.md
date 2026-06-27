@@ -32,22 +32,22 @@ The bootstrap image SHALL produce its initial diagnostic message using only boot
 
 ### Requirement: Deterministic bootstrap scope
 
-The bootstrap image SHALL perform no application logic beyond initialization, console setup, emitting diagnostic output (including network diagnostics and chat-completion diagnostics), and an orderly halt or idle loop.
+The bootstrap image SHALL perform no application logic beyond initialization, console setup, emitting diagnostic output (including network diagnostics and interactive chat session activity), and an orderly halt or idle loop after the operator ends the chat session.
 
 #### Scenario: No hidden side effects
 
 - **GIVEN** the bootstrap image is invoked for pipeline verification
 - **WHEN** boot completes
-- **THEN** no persistent services beyond boot-time diagnostics remain active
+- **THEN** no persistent services beyond boot-time diagnostics and the interactive chat session remain active
 - **AND** no persistent mutations are made to attached storage
-- **AND** behavior is suitable for repeated smoke testing
+- **AND** behavior remains suitable for repeated smoke testing when the session is ended explicitly
 
-#### Scenario: Network scope bounded to diagnostics
+#### Scenario: Network scope bounded to chat session
 
 - **GIVEN** a correctly built bootstrap image
-- **WHEN** boot completes
-- **THEN** network activity is limited to address acquisition, address reporting, a single connectivity probe, and a single chat-completion HTTP exchange
-- **AND** no listening servers or background retry loops continue after diagnostics finish
+- **WHEN** the interactive chat session is active
+- **THEN** network activity is limited to address acquisition, address reporting, a single connectivity probe, and HTTP chat-completion exchanges for submitted user lines
+- **AND** no listening servers or background retry loops continue outside active inference for a submitted line
 
 ### Requirement: Build identity in diagnostic output
 
