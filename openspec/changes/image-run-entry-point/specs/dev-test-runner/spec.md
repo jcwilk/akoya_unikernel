@@ -70,7 +70,9 @@ In headless mode, the run entry point SHALL terminate within a bounded time when
 
 ### Requirement: Explicit boot image selection
 
-The run entry point SHALL accept an optional path identifying which built boot image to run. When the path is omitted, the entry point SHALL resolve the image from the project's build output area.
+The run entry point SHALL accept an optional path identifying which built boot image to run. When the path is omitted, the entry point SHALL resolve the image from the project's build output area by **logical image identity**, not by raw file count.
+
+Co-emitted format variants of the same logical identity (e.g. linked and flat encodings of one build named `v1`) SHALL count as a single runnable candidate when determining whether exactly one image exists for auto-selection.
 
 #### Scenario: Caller supplies image path
 
@@ -78,26 +80,34 @@ The run entry point SHALL accept an optional path identifying which built boot i
 - **WHEN** the run entry point is invoked in either display mode
 - **THEN** that image is the one started under emulation
 
-#### Scenario: Exactly one runnable image in output area
+#### Scenario: Exactly one logical image in output area
 
 - **GIVEN** no image path is provided
-- **AND** the build output area contains exactly one runnable boot image
+- **AND** the build output area contains exactly one logical runnable image
 - **WHEN** the run entry point is invoked
-- **THEN** that sole runnable image is selected automatically
+- **THEN** that sole logical image is selected automatically
+
+#### Scenario: Format variants do not create ambiguity
+
+- **GIVEN** no image path is provided
+- **AND** the build output area contains multiple on-disk artifacts that are format variants of the same logical image `v1`
+- **WHEN** the run entry point resolves candidates
+- **THEN** `v1` is counted once toward the exactly-one rule
+- **AND** auto-selection proceeds as if only one logical image were present
 
 #### Scenario: No runnable images
 
 - **GIVEN** no image path is provided
-- **AND** the build output area contains zero runnable boot images
+- **AND** the build output area contains zero logical runnable images
 - **WHEN** the run entry point is invoked
 - **THEN** it exits immediately with a non-zero status
 - **AND** the error explains that no runnable image was found and a build is required
 
-#### Scenario: Multiple runnable images
+#### Scenario: Multiple logical images
 
 - **GIVEN** no image path is provided
-- **AND** the build output area contains more than one runnable boot image
+- **AND** the build output area contains more than one logical runnable image
 - **WHEN** the run entry point is invoked
 - **THEN** it exits immediately with a non-zero status
 - **AND** the error explains that the image path must be specified
-- **AND** the error enumerates the ambiguous candidates so the caller can choose
+- **AND** the error enumerates the ambiguous **logical identities** (not every format variant) so the caller can choose

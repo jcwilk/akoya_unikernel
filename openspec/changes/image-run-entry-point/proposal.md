@@ -6,7 +6,8 @@ Running built images today splits across ad-hoc flags and Makefile targets, with
 
 - Introduce one documented script as the canonical way to run a built boot image under emulation.
 - **BREAKING:** Require callers to specify either headful or headless mode; the runner SHALL NOT infer a default display mode.
-- Accept an optional path to a specific boot image; when omitted, auto-select only when the build output area contains exactly one runnable image, otherwise fail fast with an explanatory error.
+- Accept an optional path to a specific boot image; when omitted, auto-select only when the build output area contains exactly one **logical** runnable image, otherwise fail fast with an explanatory error.
+- Treat co-emitted format variants of the same build identity (e.g. `v1.elf` and `v1.bin`) as a single logical image named by its stem (`v1`), not as ambiguous multiples.
 - Align existing Makefile test/run targets and QEMU wrapper behavior with the new entry-point contract.
 - Clarify which existing smoke-test behaviors (timeout, message assertion, serial capture) apply only in headless mode.
 
@@ -18,7 +19,7 @@ Running built images today splits across ad-hoc flags and Makefile targets, with
 
 ### Modified Capabilities
 
-- `dev-test-runner`: Replace implicit run/smoke-test invocation with a unified run entry point, mandatory headful/headless mode, and deterministic artifact resolution from the build output area.
+- `dev-test-runner`: Replace implicit run/smoke-test invocation with a unified run entry point, mandatory headful/headless mode, and deterministic artifact resolution that groups format variants by logical image identity.
 
 ## Impact
 
