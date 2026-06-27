@@ -12,6 +12,8 @@
 #define TCP_FLAG_PSH 0x08U
 #define TCP_FLAG_ACK 0x10U
 
+#define TCP_CLOSE_DRAIN_MS 500U
+
 struct tcp_header {
     uint16_t src_port;
     uint16_t dst_port;
@@ -43,6 +45,8 @@ static int conn_reset;
 static uint8_t *recv_buf;
 static uint16_t recv_cap;
 static uint16_t recv_len;
+static uint16_t next_local_port = 0;
+static int handler_registered;
 
 static uint16_t tcp_checksum(ipv4_addr_t src, ipv4_addr_t dst, const uint8_t *tcp, uint16_t length)
 {
@@ -169,10 +173,6 @@ static void tcp_ipv4_handler(const uint8_t *packet, uint16_t length, void *ctx)
         }
     }
 
-    if (flags & TCP_FLAG_ACK) {
-        (void)net_be32(tcp->ack);
-    }
-
     if (payload_len > 0 && conn_established) {
         if (seq == conn_ack && recv_buf != 0) {
             uint16_t space = (recv_cap > recv_len) ? (uint16_t)(recv_cap - recv_len) : 0;
@@ -209,105 +209,253 @@ static int predicate_syn_ack(void)
     return conn_established || conn_reset;
 }
 
-static int predicate_recv_done(void)
+static uint32_t tcp_entropy32(void)
 {
-    return conn_remote_fin || conn_reset
-        || (recv_buf != 0 && recv_len >= recv_cap);
+    uint32_t lo;
+    __asm__ volatile ("rdtsc" : "=a"(lo) : : "edx");
+    return lo ^ time_millis();
 }
 
-tcp_status_t tcp_connect_send_recv(
+static void tcp_seed_ports(void)
+{
+    if (next_local_port != 0) {
+        return;
+    }
+
+    next_local_port = (uint16_t)(49152U + (tcp_entropy32() & 0x3FFFU));
+    if (next_local_port < 49152U) {
+        next_local_port = 49152U;
+    }
+}
+
+static uint16_t tcp_alloc_local_port(void)
+{
+    tcp_seed_ports();
+    uint16_t port = next_local_port++;
+    if (next_local_port < 49152U || next_local_port > 65000U) {
+        next_local_port = (uint16_t)(49152U + (tcp_entropy32() & 0x0FFFU));
+    }
+    return port;
+}
+
+static void tcp_register_handler(void)
+{
+    if (!handler_registered) {
+        link_register_ipv4_handler(tcp_ipv4_handler, 0);
+        handler_registered = 1;
+    }
+}
+
+static void tcp_unregister_handler(void)
+{
+    if (handler_registered) {
+        link_register_ipv4_handler(0, 0);
+        handler_registered = 0;
+    }
+}
+
+static void tcp_reset_flow_state(void)
+{
+    conn_remote_ip.bytes[0] = 0;
+    conn_remote_ip.bytes[1] = 0;
+    conn_remote_ip.bytes[2] = 0;
+    conn_remote_ip.bytes[3] = 0;
+    conn_local_port = 0;
+    conn_remote_port = 0;
+    conn_seq = 0;
+    conn_ack = 0;
+    conn_established = 0;
+    conn_remote_fin = 0;
+    conn_reset = 0;
+    recv_buf = 0;
+    recv_cap = 0;
+    recv_len = 0;
+}
+
+int tcp_transport_inactive(void)
+{
+    return !handler_registered
+        && !conn_established
+        && !conn_reset
+        && !conn_remote_fin
+        && recv_buf == 0
+        && recv_len == 0
+        && conn_local_port == 0
+        && conn_remote_port == 0;
+}
+
+static void tcp_begin_recv(uint8_t *buf, uint16_t cap, uint16_t *len_out)
+{
+    recv_buf = buf;
+    recv_cap = cap;
+    recv_len = 0;
+    conn_remote_fin = 0;
+    conn_reset = 0;
+
+    if (len_out != 0) {
+        *len_out = 0;
+    }
+}
+
+tcp_status_t tcp_session_open(
+    tcp_session_t *session,
     ipv4_addr_t dest,
     uint16_t dest_port,
-    const uint8_t *send_data,
-    uint16_t send_len,
-    uint8_t *recv_buffer,
-    uint16_t recv_capacity,
-    uint16_t *recv_len_out,
     uint32_t timeout_ms)
 {
-    for (int i = 0; i < 32; i++) {
-        link_poll();
+    if (session == 0) {
+        return TCP_FAIL_CONNECT;
     }
+
+    link_drain_rx(512);
 
     conn_remote_ip = dest;
     conn_remote_port = dest_port;
-    conn_local_port = (uint16_t)(49152U + ((time_millis() >> 4) & 0x0FFFU));
+    conn_local_port = tcp_alloc_local_port();
     conn_seq = time_millis();
     conn_ack = 0;
     conn_established = 0;
     conn_remote_fin = 0;
     conn_reset = 0;
-    recv_buf = recv_buffer;
-    recv_cap = recv_capacity;
+    recv_buf = 0;
+    recv_cap = 0;
     recv_len = 0;
 
-    if (recv_len_out != 0) {
-        *recv_len_out = 0;
-    }
-
-    link_register_ipv4_handler(tcp_ipv4_handler, 0);
+    tcp_register_handler();
 
     uint32_t deadline = time_millis() + timeout_ms;
 
     if (tcp_send_segment(TCP_FLAG_SYN, 0, 0) != 0) {
-        link_register_ipv4_handler(0, 0);
+        tcp_unregister_handler();
+        tcp_reset_flow_state();
+        session->open = 0;
         return TCP_FAIL_CONNECT;
     }
     conn_seq++;
 
     if (tcp_wait_until(deadline, predicate_syn_ack) != TCP_OK) {
-        link_register_ipv4_handler(0, 0);
+        tcp_unregister_handler();
+        tcp_reset_flow_state();
+        session->open = 0;
         return TCP_FAIL_TIMEOUT;
     }
 
     if (conn_reset || !conn_established) {
-        link_register_ipv4_handler(0, 0);
+        tcp_unregister_handler();
+        tcp_reset_flow_state();
+        session->open = 0;
         return TCP_FAIL_CONNECT;
     }
 
     if (tcp_send_segment(TCP_FLAG_ACK, 0, 0) != 0) {
-        link_register_ipv4_handler(0, 0);
+        tcp_unregister_handler();
+        tcp_reset_flow_state();
+        session->open = 0;
         return TCP_FAIL_SEND;
     }
 
-    if (send_len > 0) {
-        if (tcp_send_segment((uint8_t)(TCP_FLAG_ACK | TCP_FLAG_PSH), send_data, send_len) != 0) {
-            link_register_ipv4_handler(0, 0);
-            return TCP_FAIL_SEND;
-        }
-        conn_seq += send_len;
+    session->open = 1;
+    return TCP_OK;
+}
+
+tcp_status_t tcp_session_send(tcp_session_t *session, const uint8_t *data, uint16_t len)
+{
+    if (session == 0 || !session->open || !conn_established || conn_reset) {
+        return TCP_FAIL_SEND;
     }
 
-    if (tcp_wait_until(deadline, predicate_recv_done) != TCP_OK) {
-        (void)tcp_send_segment(TCP_FLAG_FIN | TCP_FLAG_ACK, 0, 0);
-        link_register_ipv4_handler(0, 0);
-        if (recv_len_out != 0) {
-            *recv_len_out = recv_len;
-        }
-        return TCP_FAIL_TIMEOUT;
+    if (len == 0) {
+        return TCP_OK;
     }
 
-    if (conn_reset) {
-        link_register_ipv4_handler(0, 0);
+    if (tcp_send_segment((uint8_t)(TCP_FLAG_ACK | TCP_FLAG_PSH), data, len) != 0) {
+        return TCP_FAIL_SEND;
+    }
+
+    conn_seq += len;
+    return TCP_OK;
+}
+
+tcp_status_t tcp_session_recv_until(
+    tcp_session_t *session,
+    uint8_t *buf,
+    uint16_t cap,
+    uint16_t *len_out,
+    tcp_recv_complete_fn complete,
+    void *ctx,
+    uint32_t timeout_ms)
+{
+    if (session == 0 || !session->open) {
         return TCP_FAIL_RECV;
     }
 
-    (void)tcp_send_segment(TCP_FLAG_FIN | TCP_FLAG_ACK, 0, 0);
-    conn_seq++;
+    tcp_begin_recv(buf, cap, len_out);
 
-    uint32_t fin_deadline = time_millis() + 2000U;
-    while (time_millis() < fin_deadline) {
+    uint32_t deadline = time_millis() + timeout_ms;
+
+    while (time_millis() < deadline) {
         link_poll();
+
+        if (conn_reset) {
+            if (len_out != 0) {
+                *len_out = recv_len;
+            }
+            session->open = 0;
+            tcp_unregister_handler();
+            tcp_reset_flow_state();
+            return TCP_FAIL_RECV;
+        }
+
+        if (complete != 0 && complete(buf, recv_len, ctx)) {
+            if (len_out != 0) {
+                *len_out = recv_len;
+            }
+            return TCP_OK;
+        }
+
         if (conn_remote_fin) {
-            break;
+            if (len_out != 0) {
+                *len_out = recv_len;
+            }
+            session->open = 0;
+            return TCP_OK;
         }
     }
 
-    link_register_ipv4_handler(0, 0);
-
-    if (recv_len_out != 0) {
-        *recv_len_out = recv_len;
+    if (len_out != 0) {
+        *len_out = recv_len;
     }
 
-    return TCP_OK;
+    return TCP_FAIL_TIMEOUT;
+}
+
+void tcp_session_close(tcp_session_t *session)
+{
+    if (session == 0) {
+        tcp_unregister_handler();
+        tcp_reset_flow_state();
+        return;
+    }
+
+    if (!session->open) {
+        tcp_unregister_handler();
+        tcp_reset_flow_state();
+        session->open = 0;
+        return;
+    }
+
+    if (conn_established && !conn_reset) {
+        (void)tcp_send_segment(TCP_FLAG_FIN | TCP_FLAG_ACK, 0, 0);
+        conn_seq++;
+
+        uint32_t close_deadline = time_millis() + TCP_CLOSE_DRAIN_MS;
+        while (time_millis() < close_deadline) {
+            link_poll();
+        }
+    }
+
+    tcp_unregister_handler();
+    link_drain_rx(512);
+    tcp_reset_flow_state();
+    session->open = 0;
 }

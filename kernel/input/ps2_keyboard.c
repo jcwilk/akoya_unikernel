@@ -2,7 +2,6 @@
 
 #include "console/console.h"
 #include "io/io.h"
-#include "net/link/link.h"
 
 #define PS2_DATA_PORT   0x60
 #define PS2_STATUS_PORT 0x64
@@ -126,80 +125,70 @@ static int ps2_handle_modifier(unsigned char scan, int is_break)
     return 0;
 }
 
-static int ps2_read_scancode(unsigned char *scan_out)
+int ps2_poll_scancode(unsigned char *scan_out)
 {
-    for (;;) {
-        link_poll();
-
-        if (inb(PS2_STATUS_PORT) & PS2_STATUS_OUT) {
-            unsigned char scan = inb(PS2_DATA_PORT);
-            if (scan == 0xE0) {
-                ps2_wait_input();
-                if (inb(PS2_STATUS_PORT) & PS2_STATUS_OUT) {
-                    (void)inb(PS2_DATA_PORT);
-                }
-                continue;
-            }
-
-            int is_break = (scan & 0x80) != 0;
-            unsigned char make = (unsigned char)(scan & 0x7FU);
-
-            if (ps2_handle_modifier(make, is_break)) {
-                continue;
-            }
-
-            if (is_break) {
-                continue;
-            }
-
-            *scan_out = make;
-            return 0;
-        }
+    if (!(inb(PS2_STATUS_PORT) & PS2_STATUS_OUT)) {
+        return 1;
     }
+
+    unsigned char scan = inb(PS2_DATA_PORT);
+    if (scan == 0xE0) {
+        ps2_wait_input();
+        if (inb(PS2_STATUS_PORT) & PS2_STATUS_OUT) {
+            (void)inb(PS2_DATA_PORT);
+        }
+        return 1;
+    }
+
+    int is_break = (scan & 0x80) != 0;
+    unsigned char make = (unsigned char)(scan & 0x7FU);
+
+    if (ps2_handle_modifier(make, is_break)) {
+        return 1;
+    }
+
+    if (is_break) {
+        return 1;
+    }
+
+    *scan_out = make;
+    return 0;
 }
 
-int ps2_read_line(char *buf, int cap)
+char ps2_scancode_to_ascii(unsigned char scan)
 {
-    if (cap <= 0) {
-        return -1;
+    return scan_to_ascii(scan, shift_active);
+}
+
+int ps2_process_scancode(unsigned char scan, char *buf, int cap, int *len_io)
+{
+    if (scan == 0x1C) {
+        console_newline();
+        return 1;
     }
 
-    int len = 0;
-    buf[0] = '\0';
-
-    for (;;) {
-        unsigned char scan = 0;
-        if (ps2_read_scancode(&scan) != 0) {
-            return -1;
+    if (scan == 0x0E) {
+        if (*len_io > 0) {
+            (*len_io)--;
+            buf[*len_io] = '\0';
+            console_backspace();
         }
-
-        if (scan == 0x1C) {
-            console_newline();
-            return len;
-        }
-
-        if (scan == 0x0E) {
-            if (len > 0) {
-                len--;
-                buf[len] = '\0';
-                console_backspace();
-            }
-            continue;
-        }
-
-        char ch = scan_to_ascii(scan, shift_active);
-        if (ch == '\0') {
-            continue;
-        }
-
-        if (len + 1 >= cap) {
-            continue;
-        }
-
-        buf[len++] = ch;
-        buf[len] = '\0';
-
-        char echo[2] = { ch, '\0' };
-        console_write(echo);
+        return 0;
     }
+
+    char ch = scan_to_ascii(scan, shift_active);
+    if (ch == '\0') {
+        return 0;
+    }
+
+    if (*len_io + 1 >= cap) {
+        return 0;
+    }
+
+    buf[(*len_io)++] = ch;
+    buf[*len_io] = '\0';
+
+    char echo[2] = { ch, '\0' };
+    console_write(echo);
+    return 0;
 }

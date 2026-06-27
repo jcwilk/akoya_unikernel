@@ -351,14 +351,30 @@ void link_announce_ipv4(ipv4_addr_t address)
     link_send_raw_frame(broadcast_mac, ETH_TYPE_ARP, (const uint8_t *)&arp, (uint16_t)sizeof(arp));
 }
 
+#define LINK_RX_DRAIN_ALL 0
+
 void link_poll(void)
+{
+    time_poll();
+    link_drain_rx(LINK_RX_DRAIN_ALL);
+}
+
+void link_drain_rx(int max_frames)
 {
     uint8_t frame[1600];
     uint16_t length = 0;
+    int drained = 0;
 
-    time_poll();
+    for (;;) {
+        if (max_frames > 0 && drained >= max_frames) {
+            break;
+        }
 
-    while (eth_poll(nic, frame, (uint16_t)sizeof(frame), &length) == 0) {
+        int status = eth_poll(nic, frame, (uint16_t)sizeof(frame), &length);
+        if (status != 0) {
+            break;
+        }
         dispatch_frame(frame, length);
+        drained++;
     }
 }

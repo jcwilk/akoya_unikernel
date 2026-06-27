@@ -21,5 +21,6 @@ void link_register_ipv4_handler(link_ipv4_handler_t handler, void *ctx);
 void link_register_arp_handler(link_arp_handler_t handler, void *ctx);
 void link_announce_ipv4(ipv4_addr_t address);
 void link_poll(void);
+void link_drain_rx(int max_frames);
 
 #endif

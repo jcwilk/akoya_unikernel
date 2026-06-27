@@ -168,6 +168,7 @@ main() {
         "${ROOT_DIR}/kernel/boot/entry.S"
         "${ROOT_DIR}/kernel/console/console.c"
         "${ROOT_DIR}/kernel/input/ps2_keyboard.c"
+        "${ROOT_DIR}/kernel/input/ps2_readline.c"
         "${ROOT_DIR}/kernel/pci/pci.c"
         "${ROOT_DIR}/kernel/time/time.c"
         "${ROOT_DIR}/kernel/net/eth/eth.c"

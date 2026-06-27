@@ -2,6 +2,7 @@
 
 #include "console/console.h"
 #include "input/ps2_keyboard.h"
+#include "input/ps2_readline.h"
 #include "net/tcp/tcp.h"
 
 #ifndef AKOYA_CHAT_HOST_IP0
@@ -419,6 +420,73 @@ static int build_messages_json(const chat_history_t *history, char *json, int ca
     return pos;
 }
 
+static int parse_content_length(const char *response, int length, int hdr_end, int *cl_out)
+{
+    const char *needle = "content-length:";
+    int needle_len = 15;
+
+    for (int i = 0; i + needle_len < hdr_end; i++) {
+        int match = 1;
+        for (int j = 0; j < needle_len; j++) {
+            char a = response[i + j];
+            char b = needle[j];
+            if (a >= 'A' && a <= 'Z') {
+                a = (char)(a + ('a' - 'A'));
+            }
+            if (a != b) {
+                match = 0;
+                break;
+            }
+        }
+        if (!match) {
+            continue;
+        }
+
+        int p = i + needle_len;
+        while (p < hdr_end && (response[p] == ' ' || response[p] == '\t')) {
+            p++;
+        }
+
+        int value = 0;
+        int digits = 0;
+        while (p < hdr_end && response[p] >= '0' && response[p] <= '9') {
+            value = value * 10 + (response[p] - '0');
+            digits++;
+            p++;
+        }
+
+        if (digits == 0) {
+            return -1;
+        }
+
+        *cl_out = value;
+        return 0;
+    }
+
+    return -1;
+}
+
+static int http_response_complete(const uint8_t *buf, uint16_t len, void *ctx)
+{
+    (void)ctx;
+
+    if (len < 16) {
+        return 0;
+    }
+
+    int hdr_end = body_offset((const char *)buf, (int)len);
+    if (hdr_end < 0) {
+        return 0;
+    }
+
+    int content_length = 0;
+    if (parse_content_length((const char *)buf, (int)len, hdr_end, &content_length) != 0) {
+        return 0;
+    }
+
+    return ((int)len - hdr_end) >= content_length;
+}
+
 static int build_request(const char *json, int json_len, char *buf, int cap, int *len_out)
 {
     char host[24];
@@ -475,7 +543,7 @@ static int build_request(const char *json, int json_len, char *buf, int cap, int
 
     int pos = 0;
     const char *req_prefix =
-        "POST " AKOYA_CHAT_PATH " HTTP/1.0\r\n"
+        "POST " AKOYA_CHAT_PATH " HTTP/1.1\r\n"
         "Host: ";
     const char *req_mid =
         "\r\n"
@@ -498,31 +566,92 @@ static int build_request(const char *json, int json_len, char *buf, int cap, int
     return 0;
 }
 
-static const char *tcp_fail_reason(tcp_status_t status)
+static const char *http_chat_fail_reason(http_chat_status_t status)
 {
-    if (status == TCP_FAIL_CONNECT) {
-        return "connect";
-    }
-    if (status == TCP_FAIL_TIMEOUT) {
+    if (status == HTTP_CHAT_FAIL_TIMEOUT) {
         return "timeout";
+    }
+    if (status == HTTP_CHAT_FAIL_HTTP) {
+        return "http";
+    }
+    if (status == HTTP_CHAT_FAIL_PARSE) {
+        return "parse";
+    }
+    if (status == HTTP_CHAT_FAIL_OVERFLOW) {
+        return "overflow";
     }
     return "connect";
 }
 
-static http_chat_status_t http_chat_exchange(chat_history_t *history, char *reply, int reply_cap)
+static http_chat_status_t http_chat_turn_exchange(
+    tcp_session_t *session,
+    chat_history_t *history,
+    char *reply,
+    int reply_cap)
 {
     static char json[CHAT_JSON_BUDGET];
     int json_len = build_messages_json(history, json, (int)sizeof(json));
     if (json_len < 0) {
-        emit_fail("overflow");
         return HTTP_CHAT_FAIL_OVERFLOW;
     }
 
     static char request[512 + CHAT_JSON_BUDGET];
     int request_len = 0;
     if (build_request(json, json_len, request, (int)sizeof(request), &request_len) != 0) {
-        emit_fail("parse");
         return HTTP_CHAT_FAIL_PARSE;
+    }
+
+    static uint8_t response[HTTP_CHAT_RECV_CAP];
+    uint16_t response_len = 0;
+
+    tcp_status_t tcp_status = tcp_session_send(session, (const uint8_t *)request, (uint16_t)request_len);
+    if (tcp_status != TCP_OK) {
+        return HTTP_CHAT_FAIL_CONNECT;
+    }
+
+    tcp_status = tcp_session_recv_until(
+        session,
+        response,
+        (uint16_t)sizeof(response),
+        &response_len,
+        http_response_complete,
+        0,
+        AKOYA_CHAT_TIMEOUT_MS);
+
+    if (tcp_status == TCP_FAIL_TIMEOUT) {
+        return HTTP_CHAT_FAIL_TIMEOUT;
+    }
+    if (tcp_status != TCP_OK) {
+        return HTTP_CHAT_FAIL_CONNECT;
+    }
+
+    if (response_len == 0) {
+        return HTTP_CHAT_FAIL_HTTP;
+    }
+
+    int http_status = 0;
+    if (parse_http_status((const char *)response, (int)response_len, &http_status) != 0
+        || http_status < 200 || http_status >= 300) {
+        return HTTP_CHAT_FAIL_HTTP;
+    }
+
+    int body_start = body_offset((const char *)response, (int)response_len);
+    if (body_start < 0 || body_start >= (int)response_len) {
+        return HTTP_CHAT_FAIL_PARSE;
+    }
+
+    int body_len = (int)response_len - body_start;
+    if (extract_json_content((const char *)response + body_start, body_len, reply, reply_cap) < 0) {
+        return HTTP_CHAT_FAIL_PARSE;
+    }
+
+    return HTTP_CHAT_OK;
+}
+
+static http_chat_status_t http_chat_run_turn(chat_history_t *history, char *reply, int reply_cap)
+{
+    if (!tcp_transport_inactive()) {
+        return HTTP_CHAT_FAIL_CONNECT;
     }
 
     ipv4_addr_t host;
@@ -531,53 +660,32 @@ static http_chat_status_t http_chat_exchange(chat_history_t *history, char *repl
     host.bytes[2] = AKOYA_CHAT_HOST_IP2;
     host.bytes[3] = AKOYA_CHAT_HOST_IP3;
 
-    static uint8_t response[HTTP_CHAT_RECV_CAP];
-    uint16_t response_len = 0;
+    tcp_session_t session;
+    session.open = 0;
 
-    tcp_status_t tcp_status = tcp_connect_send_recv(
+    tcp_status_t open_status = tcp_session_open(
+        &session,
         host,
         (uint16_t)AKOYA_CHAT_PORT,
-        (const uint8_t *)request,
-        (uint16_t)request_len,
-        response,
-        (uint16_t)sizeof(response),
-        &response_len,
         AKOYA_CHAT_TIMEOUT_MS);
 
-    if (tcp_status != TCP_OK) {
-        emit_fail(tcp_fail_reason(tcp_status));
-        if (tcp_status == TCP_FAIL_TIMEOUT) {
+    if (open_status != TCP_OK) {
+        tcp_session_close(&session);
+        if (open_status == TCP_FAIL_TIMEOUT) {
             return HTTP_CHAT_FAIL_TIMEOUT;
         }
         return HTTP_CHAT_FAIL_CONNECT;
     }
 
-    if (response_len == 0) {
-        emit_fail("http");
-        return HTTP_CHAT_FAIL_HTTP;
+    http_chat_status_t status = http_chat_turn_exchange(&session, history, reply, reply_cap);
+
+    tcp_session_close(&session);
+
+    if (!tcp_transport_inactive()) {
+        return HTTP_CHAT_FAIL_CONNECT;
     }
 
-    int http_status = 0;
-    if (parse_http_status((const char *)response, (int)response_len, &http_status) != 0
-        || http_status < 200 || http_status >= 300) {
-        emit_fail("http");
-        return HTTP_CHAT_FAIL_HTTP;
-    }
-
-    int body_start = body_offset((const char *)response, (int)response_len);
-    if (body_start < 0 || body_start >= (int)response_len) {
-        emit_fail("parse");
-        return HTTP_CHAT_FAIL_PARSE;
-    }
-
-    int body_len = (int)response_len - body_start;
-    if (extract_json_content((const char *)response + body_start, body_len, reply, reply_cap) < 0) {
-        emit_fail("parse");
-        return HTTP_CHAT_FAIL_PARSE;
-    }
-
-    emit_ok(reply);
-    return HTTP_CHAT_OK;
+    return status;
 }
 
 void http_chat_session(void)
@@ -613,9 +721,12 @@ void http_chat_session(void)
             continue;
         }
 
-        http_chat_status_t status = http_chat_exchange(&history, reply, (int)sizeof(reply));
+        http_chat_status_t status = http_chat_run_turn(&history, reply, (int)sizeof(reply));
         if (status == HTTP_CHAT_OK) {
             chat_history_set_assistant(&history, reply);
+            emit_ok(reply);
+        } else {
+            emit_fail(http_chat_fail_reason(status));
         }
     }
 }

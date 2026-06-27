@@ -13,14 +13,31 @@ typedef enum {
     TCP_FAIL_RECV
 } tcp_status_t;
 
-tcp_status_t tcp_connect_send_recv(
+typedef struct {
+    int open;
+} tcp_session_t;
+
+typedef int (*tcp_recv_complete_fn)(const uint8_t *buf, uint16_t len, void *ctx);
+
+tcp_status_t tcp_session_open(
+    tcp_session_t *session,
     ipv4_addr_t dest,
     uint16_t dest_port,
-    const uint8_t *send_data,
-    uint16_t send_len,
-    uint8_t *recv_buf,
-    uint16_t recv_cap,
-    uint16_t *recv_len_out,
     uint32_t timeout_ms);
+
+tcp_status_t tcp_session_send(tcp_session_t *session, const uint8_t *data, uint16_t len);
+
+tcp_status_t tcp_session_recv_until(
+    tcp_session_t *session,
+    uint8_t *buf,
+    uint16_t cap,
+    uint16_t *len_out,
+    tcp_recv_complete_fn complete,
+    void *ctx,
+    uint32_t timeout_ms);
+
+void tcp_session_close(tcp_session_t *session);
+
+int tcp_transport_inactive(void);
 
 #endif
