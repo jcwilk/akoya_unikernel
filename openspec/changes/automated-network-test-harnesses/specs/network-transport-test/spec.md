@@ -56,11 +56,11 @@ The transport-test boot image SHALL run without operator keyboard input and with
 
 ### Requirement: Bounded transport scenario suite
 
-The transport-test image SHALL execute a fixed, bounded suite of transport scenarios designed to stress sequential connection lifecycle behavior. Each scenario SHALL report pass or fail on the console in human-readable form. The suite SHALL include at minimum: multiple sequential outbound connections to the same host, a delayed gap between connection attempts, and handling of unreachable endpoints where applicable.
+The transport-test image SHALL execute a fixed, bounded suite of transport scenarios designed to stress sequential connection lifecycle behavior. Each scenario SHALL report pass or fail on the console in human-readable form. The suite SHALL include at minimum: multiple sequential outbound connections to the same host, a delayed gap between connection attempts, and a synthetic refused-connection target where failure is the expected outcome. Scenarios that require the configured inference host SHALL NOT be skipped or reported as pass when that host is unreachable; unreachability of the configured inference host during a scenario that requires it SHALL report fail.
 
 #### Scenario: Sequential connections to same host
 
-- **GIVEN** IPv4 configuration succeeded and the configured remote host accepts outbound connections
+- **GIVEN** IPv4 configuration succeeded and the configured inference host accepts outbound connections
 - **WHEN** the sequential-connection scenario runs
 - **THEN** the image opens more than one outbound connection to the same host in order
 - **AND** console output reports pass or fail for that scenario in plain language
@@ -72,12 +72,20 @@ The transport-test image SHALL execute a fixed, bounded suite of transport scena
 - **THEN** console output indicates whether the delayed second connection succeeded
 - **AND** the reported outcome is readable without parsing key=value diagnostic framing
 
-#### Scenario: Unreachable endpoint handling
+#### Scenario: Synthetic refused connection
 
-- **GIVEN** a scenario targets a host that does not accept connections within the bounded wait period
+- **GIVEN** a scenario targets a deliberately non-listening port or endpoint where connection refusal or timeout is the expected outcome category
 - **WHEN** the scenario completes
-- **THEN** console output reports the scenario result as pass or fail according to the scenario's expected outcome category
-- **AND** the image continues with remaining scenarios or proceeds to aggregate reporting rather than hanging indefinitely
+- **THEN** console output reports pass when the expected failure category is observed
+- **AND** the image continues with remaining scenarios and proceeds to aggregate reporting rather than hanging indefinitely
+
+#### Scenario: Configured inference host unreachable fails required scenarios
+
+- **GIVEN** IPv4 configuration succeeded on the transport-test image
+- **AND** the configured inference host does not accept outbound connections within the bounded wait period
+- **WHEN** a scenario that requires that host runs
+- **THEN** console output reports fail for that scenario
+- **AND** the scenario is not omitted from the suite or reported as pass due to skip
 
 ### Requirement: Aggregate result and orderly completion
 

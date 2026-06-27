@@ -1,5 +1,32 @@
 ## ADDED Requirements
 
+### Requirement: Inference endpoint pre-flight before automated verification
+
+Before starting headless automated verification that depends on the configured chat or inference host—including default smoke, scripted full-app interaction, and transport-test entry points—the development test runner SHALL verify that the configured inference endpoint is reachable from the development workstation. If the endpoint is unreachable, the runner SHALL exit immediately with non-zero status and actionable error output **without** starting emulation, **without** running partial scenarios, and **without** treating unreachability as an optional skip. A reachable inference endpoint is a required precondition for verification; unreachability indicates environment or configuration that must be corrected before verification proceeds.
+
+#### Scenario: Abort before emulation when inference endpoint is down
+
+- **GIVEN** the configured chat or inference endpoint is not reachable from the development workstation within the bounded pre-flight check
+- **WHEN** an agent invokes any automated verification entry point that depends on that endpoint
+- **THEN** the runner exits immediately with non-zero status
+- **AND** emulation does not start
+- **AND** no transport or chat scenario is reported as passed due to skip or omission
+
+#### Scenario: Actionable error when inference infrastructure is unavailable
+
+- **GIVEN** inference endpoint pre-flight fails
+- **WHEN** the runner exits
+- **THEN** error output states that the configured inference endpoint is unreachable
+- **AND** error output indicates that inference availability must be restored before verification can proceed
+- **AND** an operator or agent can identify the failure as an environment problem rather than a product regression
+
+#### Scenario: Pre-flight passes when inference is healthy
+
+- **GIVEN** the configured inference endpoint accepts connections from the development workstation
+- **WHEN** an agent invokes a dependent automated verification entry point
+- **THEN** pre-flight succeeds and emulation proceeds
+- **AND** verification continues under the harness or smoke contract for that entry point
+
 ### Requirement: Scripted full-app interaction with output assertions
 
 The development test runner SHALL support a host-side scripted interaction mode for the main interactive chat unikernel that combines timed keyboard injection with output assertions between steps. A script SHALL describe delays, text to type, optional session exit actions, and expected console patterns that must appear before the next step proceeds. The mode SHALL run non-interactively and report pass or fail with actionable output when an assertion is not satisfied.

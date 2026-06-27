@@ -54,9 +54,11 @@ Recent work on per-turn TCP teardown (`sequential-chat-tcp-lifecycle`) clarified
 
 Each prints `scenario <name>: PASS` or `scenario <name>: FAIL (<reason>)`. Final line: `transport-test: ALL PASS` or `transport-test: FAILED (<count> failures)`.
 
-**Unreachable endpoint policy:** If pre-flight on the workstation shows chat host unreachable, transport-test entry point may skip HTTP-dependent scenarios but **must still run** TCP-to-configured-host scenarios when the host is reachable; refused-port scenario uses a dedicated unused port on localhost/LAN. Document skip vs hard-fail in runner README.
+**Inference endpoint reachability policy (non-negotiable):** The configured chat/inference host **must** be reachable from the development workstation before any automated verification that depends on it starts. Host-side pre-flight (same class of check already used before chat smoke runs) **aborts immediately** with non-zero exit and actionable error if the endpoint is unreachable—**no emulation start, no partial suite, no scenario skip.** A healthy development environment is expected to have inference available; unreachable endpoint indicates infrastructure or configuration that must be fixed, not a condition to degrade around.
 
-**Rationale:** Targets the reported pain point (turn 2+ connect failures) without requiring chat HTTP.
+The **refused-connection** scenario is synthetic: it targets a deliberately closed port or non-listening endpoint on the LAN to verify failure categorization. It is **not** a substitute for the inference host being down—if the configured inference host is unreachable, the run aborts at pre-flight before scenarios execute.
+
+**Rationale:** Targets the reported pain point (turn 2+ connect failures) without requiring chat HTTP; agents must never get a false pass because inference was offline.
 
 ### Decision 4: Script format for full-app harness (Deliverable B)
 
@@ -143,5 +145,5 @@ Rollback: remove new build target and runner flags; main chat image unchanged.
 
 ## Open Questions
 
-- Exact unused port for refused-connection scenario on operator LAN (pick high ephemeral, document in README).
+- Exact unused port for refused-connection scenario on operator LAN (pick high ephemeral, document in README). Must not conflate with inference host unreachability.
 - Whether transport-test should share chat host IP env vars (`AKOYA_CHAT_HOST_IP`, `AKOYA_CHAT_PORT`) — **presumed yes** for consistency.
