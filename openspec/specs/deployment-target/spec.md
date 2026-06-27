@@ -35,13 +35,21 @@ Boot images SHALL be compatible with i686-class 32-bit x86 execution and SHALL N
 
 ### Requirement: Conservative hardware assumptions
 
-Boot images in this change SHALL assume modest single-core resources comparable to a legacy notebook (on the order of two gigabytes system RAM) and SHALL avoid requiring modern optional platform features beyond basic boot and console output.
+Boot images in this change SHALL assume modest single-core resources comparable to a legacy notebook (on the order of two gigabytes system RAM). Bootstrap images SHALL require wired Ethernet and basic IPv4 connectivity via DHCP to complete their declared diagnostic behavior on target-class hardware.
 
-#### Scenario: Minimal platform footprint
+#### Scenario: Network bootstrap uses wired Ethernet only
 
-- **GIVEN** the bootstrap image is built for the Akoya profile
+- **GIVEN** a bootstrap image built for the Akoya profile
+- **WHEN** it boots on target-class hardware with a connected RJ-45 link and reachable DHCP
+- **THEN** it completes its network diagnostics using the wired Ethernet interface documented for the Medion Akoya EX
+- **AND** it does not require wireless, modem, or Bluetooth hardware to complete its diagnostic behavior
+
+#### Scenario: Required platform features for bootstrap
+
+- **GIVEN** a bootstrap image built for the Akoya profile
 - **WHEN** it boots on target-class hardware
-- **THEN** it does not require network, storage beyond the boot medium, discrete GPU drivers, or multi-core scheduling to complete its diagnostic behavior
+- **THEN** it requires basic boot, console output, and wired Ethernet with DHCP reachability to complete its full diagnostic behavior
+- **AND** it does not require discrete GPU drivers or multi-core scheduling beyond what the network diagnostics need
 
 ### Requirement: Deployment target hardware documentation
 
