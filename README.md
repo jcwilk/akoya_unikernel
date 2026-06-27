@@ -35,10 +35,40 @@ Development workstation (Linux assumed for v1 scripts):
 ## Build and test
 
 ```bash
-make build    # cross-compile bootstrap kernel → build/kernel.bin
-make test     # build (if needed) + QEMU smoke test
+make build    # cross-compile bootstrap kernel → build/kernel.elf and build/kernel.bin
+make test     # build (if needed) + headless QEMU smoke test
+make run      # build (if needed) + headful interactive QEMU session
 make clean    # remove build/ artifacts
 ```
+
+### Run entry point (`scripts/run-qemu.sh`)
+
+The canonical way to run a built boot image under emulation. **Display mode is mandatory** — specify exactly one of `--headful` or `--headless`; the script exits with an error if neither or both are given.
+
+```bash
+# Headless smoke test (timeout + bootstrap message assertion)
+bash scripts/run-qemu.sh --headless
+
+# Interactive display window
+bash scripts/run-qemu.sh --headful
+
+# Headful via VNC (useful in Docker or on remote workstations without native X11)
+bash scripts/run-qemu.sh --headful --vnc
+# Connect with a VNC client to vnc://127.0.0.1:5900
+
+# Run a specific image
+bash scripts/run-qemu.sh --headless --image build/kernel.elf
+```
+
+**Auto-selection:** When `--image` is omitted, the script scans the build output directory (`build/`) for runnable `*.elf` and `*.bin` files and groups them by **stem** (filename without suffix). Co-emitted format variants of the same build count as one logical image — for example `kernel.elf` and `kernel.bin` are a single `kernel` image, and the runner prefers `.elf` when both exist.
+
+| Build output contents | Auto-select behavior |
+|-----------------------|----------------------|
+| `kernel.elf` + `kernel.bin` only | Selects `kernel` (uses `.elf`) |
+| No `*.elf` or `*.bin` | Fails: no runnable image; run `make build` |
+| `v1` + `v2` stems (e.g. `v1.elf`, `v2.elf`) | Fails: lists ambiguous logical identities; pass `--image` |
+
+`make test` invokes `--headless`; `make run` invokes `--headful`.
 
 ### Build environment variables
 
