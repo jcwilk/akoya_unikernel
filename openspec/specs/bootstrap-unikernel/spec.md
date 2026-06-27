@@ -32,7 +32,7 @@ The bootstrap image SHALL produce its initial diagnostic message using only boot
 
 ### Requirement: Deterministic bootstrap scope
 
-The bootstrap image SHALL perform no application logic beyond initialization, console setup, emitting diagnostic output (including network diagnostics), and an orderly halt or idle loop.
+The bootstrap image SHALL perform no application logic beyond initialization, console setup, emitting diagnostic output (including network diagnostics and chat-completion diagnostics), and an orderly halt or idle loop.
 
 #### Scenario: No hidden side effects
 
@@ -46,7 +46,7 @@ The bootstrap image SHALL perform no application logic beyond initialization, co
 
 - **GIVEN** a correctly built bootstrap image
 - **WHEN** boot completes
-- **THEN** network activity is limited to address acquisition, address reporting, and a single connectivity probe
+- **THEN** network activity is limited to address acquisition, address reporting, a single connectivity probe, and a single chat-completion HTTP exchange
 - **AND** no listening servers or background retry loops continue after diagnostics finish
 
 ### Requirement: Build identity in diagnostic output

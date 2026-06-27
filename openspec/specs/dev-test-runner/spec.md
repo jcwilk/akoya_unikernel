@@ -61,7 +61,7 @@ The QEMU runner SHALL emulate 32-bit x86 execution consistent with the deploymen
 
 In headless mode, the run entry point SHALL attach emulated serial console output so bootstrap diagnostic messages are visible in the runner's standard output or log. In headful mode, console output SHALL remain observable through the display and/or serial attachment without requiring automated capture for pass/fail.
 
-In headless mode, captured output SHALL include the assigned IPv4 address line and the connectivity probe result line.
+In headless mode, captured output SHALL include the assigned IPv4 address line, the connectivity probe result line, and the chat-completion diagnostic line.
 
 #### Scenario: Headless diagnostic message assertion
 
@@ -77,17 +77,26 @@ In headless mode, captured output SHALL include the assigned IPv4 address line a
 - **THEN** the captured output contains the assigned IPv4 address reporting line
 - **AND** the captured output contains a successful connectivity probe result with latency
 
+#### Scenario: Headless chat-completion assertion
+
+- **GIVEN** a correctly built bootstrap image
+- **AND** the workstation LAN provides DHCP
+- **AND** the configured chat-completions endpoint is reachable from the guest
+- **WHEN** the run entry point completes successfully in headless mode
+- **THEN** the captured output contains a chat-completion success indicator
+- **AND** the captured output contains non-empty assistant reply text from the completion response
+
 #### Scenario: Headful observation
 
 - **GIVEN** a correctly built bootstrap image
 - **WHEN** the run entry point is invoked in headful mode
-- **THEN** an observer can read bootstrap and network diagnostic output from the interactive session without relying on automated pass/fail gating
+- **THEN** an observer can read bootstrap, network, and chat-completion diagnostic output from the interactive session without relying on automated pass/fail gating
 
 ### Requirement: Bounded test runtime
 
 In headless mode, the run entry point SHALL terminate within a bounded time when the image fails to produce expected diagnostic output, rather than hanging indefinitely. Headful mode SHALL NOT apply the same automated timeout gate.
 
-The bounded time SHALL account for DHCP negotiation and the connectivity probe in addition to console bring-up.
+The bounded time SHALL account for DHCP negotiation, the connectivity probe, and the chat-completion HTTP exchange in addition to console bring-up.
 
 #### Scenario: Headless boot hang detection
 
