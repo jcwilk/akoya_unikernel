@@ -3,6 +3,7 @@
 #include "console/console.h"
 #include "net/dhcp/dhcp.h"
 #include "net/eth/eth.h"
+#include "net/http/http_chat.h"
 #include "net/icmp/icmp.h"
 #include "net/ipv4/ipv4.h"
 #include "net/link/link.h"
@@ -151,6 +152,7 @@ void net_bootstrap(void)
         console_write("ok rtt_ms=");
         console_write_uint32(rtt_ms);
         console_write_line("");
+        (void)http_chat_probe();
     } else if (ping_status == ICMP_FAIL_UNREACHABLE) {
         console_write_line("fail reason=unreachable");
     } else {

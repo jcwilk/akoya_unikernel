@@ -6,8 +6,10 @@ BUILD_DIR="${ROOT_DIR}/build"
 LOG_FILE="${BUILD_DIR}/qemu-smoke.log"
 
 QEMU_BIN="${AKOYA_QEMU_BIN:-qemu-system-i386}"
-TIMEOUT_SEC="${AKOYA_QEMU_TIMEOUT_SEC:-90}"
+TIMEOUT_SEC="${AKOYA_QEMU_TIMEOUT_SEC:-180}"
 BOOT_MESSAGE="${AKOYA_BOOTSTRAP_MESSAGE:-akoya_unikernel bootstrap ok}"
+CHAT_HOST="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
+CHAT_PORT="${AKOYA_CHAT_PORT:-80}"
 GUEST_MAC="${AKOYA_QEMU_GUEST_MAC:-52:54:00:12:34:56}"
 MACVTAP_IF="${AKOYA_QEMU_TAP_IF:-akoya-qemu0}"
 LAN_IF="${AKOYA_QEMU_LAN_IF:-enx00e04c6801e8}"
@@ -38,7 +40,9 @@ with fixed guest MAC ${GUEST_MAC}.
 Environment:
   AKOYA_QEMU_LAN_IF       Wired interface for macvtap parent (default: enx00e04c6801e8)
   AKOYA_QEMU_GUEST_MAC    Fixed guest MAC (default: 52:54:00:12:34:56)
-  AKOYA_QEMU_TIMEOUT_SEC  Headless timeout (default: 90)
+  AKOYA_QEMU_TIMEOUT_SEC  Headless timeout (default: 180)
+  AKOYA_CHAT_HOST_IP       Chat endpoint host for pre-flight (default: 192.168.1.110)
+  AKOYA_CHAT_PORT          Chat endpoint port for pre-flight (default: 80)
   AKOYA_AUTO_LAN          1 = macvtap up/down around each run (default: 1)
   AKOYA_LAN_LIBEXEC       Installed helper scripts for passwordless sudo (default: /usr/local/libexec/akoya)
 
@@ -51,6 +55,18 @@ EOF
 fail() {
     echo "run-qemu.sh: $*" >&2
     exit 1
+}
+
+chat_endpoint_reachable() {
+    if command -v nc >/dev/null 2>&1; then
+        nc -z -w 2 "${CHAT_HOST}" "${CHAT_PORT}" >/dev/null 2>&1
+        return $?
+    fi
+    if command -v timeout >/dev/null 2>&1 && command -v bash >/dev/null 2>&1; then
+        timeout 2 bash -c "echo >/dev/tcp/${CHAT_HOST}/${CHAT_PORT}" >/dev/null 2>&1
+        return $?
+    fi
+    return 1
 }
 
 lan_script_path() {
@@ -381,6 +397,20 @@ main() {
 
     if ! grep -Eq '^net_ping=.* status=ok rtt_ms=[0-9]+$' "${LOG_FILE}"; then
         fail "expected successful net_ping= line not found in captured output"
+    fi
+
+    local chat_assert=0
+    if chat_endpoint_reachable; then
+        chat_assert=1
+        echo "run-qemu.sh: chat endpoint ${CHAT_HOST}:${CHAT_PORT} reachable; asserting chat_completion=ok" | tee -a "${LOG_FILE}"
+    else
+        echo "run-qemu.sh: WARNING: chat endpoint ${CHAT_HOST}:${CHAT_PORT} unreachable from host; skipping chat_completion assertions" | tee -a "${LOG_FILE}"
+    fi
+
+    if [[ "${chat_assert}" -eq 1 ]]; then
+        if ! grep -Eq '^chat_completion=ok reply=.+$' "${LOG_FILE}"; then
+            fail "expected chat_completion=ok with non-empty reply not found in captured output"
+        fi
     fi
 
     echo "QEMU smoke test passed" | tee -a "${LOG_FILE}"

@@ -26,6 +26,11 @@ MEM_LIMIT_MB="${AKOYA_BUILD_MEM_LIMIT_MB:-4096}"
 MEM_LIMIT_KB=$((MEM_LIMIT_MB * 1024))
 MEM_LIMIT_BYTES=$((MEM_LIMIT_MB * 1024 * 1024))
 PROBE_HOST="${AKOYA_PROBE_HOST:-google.com}"
+CHAT_HOST_IP="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
+CHAT_PATH="${AKOYA_CHAT_PATH:-/v1/chat/completions}"
+CHAT_USER_MSG="${AKOYA_CHAT_USER_MSG:-hi}"
+CHAT_MODEL="${AKOYA_CHAT_MODEL:-default}"
+CHAT_TIMEOUT_MS="${AKOYA_CHAT_TIMEOUT_MS:-60000}"
 
 log() {
     printf '%s\n' "$*" | tee -a "${LOG_FILE}"
@@ -125,6 +130,9 @@ main() {
 
     IFS='.' read -r probe_ip0 probe_ip1 probe_ip2 probe_ip3 <<< "${probe_ip}"
 
+    local chat_ip0 chat_ip1 chat_ip2 chat_ip3
+    IFS='.' read -r chat_ip0 chat_ip1 chat_ip2 chat_ip3 <<< "${CHAT_HOST_IP}"
+
     local cflags=(
         -std=gnu99
         -ffreestanding
@@ -144,6 +152,14 @@ main() {
         -DAKOYA_PROBE_TARGET_IP2="${probe_ip2}"
         -DAKOYA_PROBE_TARGET_IP3="${probe_ip3}"
         -DAKOYA_PROBE_TARGET_LABEL=\"${probe_label}\"
+        -DAKOYA_CHAT_HOST_IP0="${chat_ip0}"
+        -DAKOYA_CHAT_HOST_IP1="${chat_ip1}"
+        -DAKOYA_CHAT_HOST_IP2="${chat_ip2}"
+        -DAKOYA_CHAT_HOST_IP3="${chat_ip3}"
+        -DAKOYA_CHAT_PATH=\"${CHAT_PATH}\"
+        -DAKOYA_CHAT_USER_MSG=\"${CHAT_USER_MSG}\"
+        -DAKOYA_CHAT_MODEL=\"${CHAT_MODEL}\"
+        -DAKOYA_CHAT_TIMEOUT_MS="${CHAT_TIMEOUT_MS}"
     )
 
     local sources=(
@@ -157,6 +173,8 @@ main() {
         "${ROOT_DIR}/kernel/net/ipv4/ipv4.c"
         "${ROOT_DIR}/kernel/net/dhcp/dhcp.c"
         "${ROOT_DIR}/kernel/net/icmp/icmp.c"
+        "${ROOT_DIR}/kernel/net/tcp/tcp.c"
+        "${ROOT_DIR}/kernel/net/http/http_chat.c"
         "${ROOT_DIR}/kernel/net/netmain.c"
         "${ROOT_DIR}/kernel/main.c"
     )

@@ -51,15 +51,21 @@ build_id=<git-id>
 net_link=ok
 net_ip=192.168.1.42
 net_ping=google.com status=ok rtt_ms=12
+chat_completion=ok reply=Hello!
 ```
+
+When the configured chat endpoint (`192.168.1.110:80` by default) is unreachable, you may see `chat_completion=fail reason=connect|timeout|http|parse` instead.
 
 Headless `make test` asserts:
 
 - Bootstrap message (`akoya_unikernel bootstrap ok`)
 - `net_ip=<dotted-quad>` with a leased IPv4 address
 - `net_ping=<label> status=ok rtt_ms=<n>` (ICMP to the build-time probe target must succeed)
+- `chat_completion=ok reply=<text>` with a non-empty reply when the host can reach `192.168.1.110:80` at test time (pre-flight check in `run-qemu.sh`)
 
-On failure you may see `net_ip=fail reason=…`, `net_link=fail reason=nic`, or `net_ping=… status=fail reason=timeout|unreachable`.
+**llama.cpp prerequisite:** For full chat-completion acceptance, run a llama.cpp OpenAI-compatible server on the workstation LAN at `http://192.168.1.110/v1/chat/completions` (HTTP port 80). When the endpoint is absent, `make test` skips chat assertions with a visible warning and still validates network bootstrap diagnostics.
+
+On failure you may see `net_ip=fail reason=…`, `net_link=fail reason=nic`, `net_ping=… status=fail reason=timeout|unreachable`, or `chat_completion=fail reason=…`.
 
 ### Macvtap QEMU networking
 
@@ -114,6 +120,11 @@ bash scripts/run-qemu.sh --headless --image build/kernel.elf
 | `AKOYA_BUILD_MEM_LIMIT_MB` | `4096` | Virtual-memory ceiling for compilation |
 | `AKOYA_CROSS_PREFIX` | `i686-elf-` | Toolchain command prefix (empty → `gcc -m32` fallback) |
 | `AKOYA_PROBE_HOST` | `google.com` | Hostname resolved at build time for ICMP probe (no DNS in guest) |
+| `AKOYA_CHAT_HOST_IP` | `192.168.1.110` | IPv4 address for chat-completion HTTP probe |
+| `AKOYA_CHAT_PATH` | `/v1/chat/completions` | HTTP path for chat-completion probe |
+| `AKOYA_CHAT_USER_MSG` | `hi` | User message in chat-completion JSON body |
+| `AKOYA_CHAT_MODEL` | `default` | Model string in chat-completion JSON body |
+| `AKOYA_CHAT_TIMEOUT_MS` | `60000` | Total timeout for chat HTTP exchange (ms) |
 
 Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `build/build.log`.
 
@@ -121,13 +132,15 @@ Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `buil
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `AKOYA_QEMU_TIMEOUT_SEC` | `90` | Max seconds before headless smoke test fails |
+| `AKOYA_QEMU_TIMEOUT_SEC` | `180` | Max seconds before headless smoke test fails |
 | `AKOYA_BOOTSTRAP_MESSAGE` | `akoya_unikernel bootstrap ok` | Expected bootstrap console line |
 | `AKOYA_QEMU_LAN_IF` | `enx00e04c6801e8` | Wired interface for macvtap parent |
 | `AKOYA_QEMU_GUEST_MAC` | `52:54:00:12:34:56` | Fixed guest MAC (when libexec pins macvtap) |
 | `AKOYA_QEMU_TAP_IF` | `akoya-qemu0` | Macvtap interface name |
 | `AKOYA_AUTO_LAN` | `1` | Ephemeral macvtap up/down around each run |
 | `AKOYA_LAN_LIBEXEC` | `/usr/local/libexec/akoya` | Installed helper scripts for passwordless sudo |
+| `AKOYA_CHAT_HOST_IP` | `192.168.1.110` | Chat endpoint host for pre-flight reachability check |
+| `AKOYA_CHAT_PORT` | `80` | Chat endpoint port for pre-flight reachability check |
 
 ## Bare-metal boot (manual)
 
