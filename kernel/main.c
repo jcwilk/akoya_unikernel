@@ -1,4 +1,5 @@
 #include "console/console.h"
+#include "net/netmain.h"
 
 #define AKOYA_BOOTSTRAP_MESSAGE "akoya_unikernel bootstrap ok"
 
@@ -12,6 +13,8 @@ void kernel_main(void)
     console_write_line(AKOYA_BOOTSTRAP_MESSAGE);
     console_write("build_id=");
     console_write_line(AKOYA_BUILD_ID);
+
+    net_bootstrap();
 
     /* QEMU isa-debug-exit (also harmless on bare metal). */
     __asm__ volatile ("outb %%al, $0xf4" : : "a"((unsigned char)0));

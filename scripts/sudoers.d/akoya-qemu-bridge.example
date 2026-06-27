@@ -1,0 +1,6 @@
+# Passwordless macvtap setup for Akoya QEMU smoke tests.
+# Install libexec scripts first: sudo bash scripts/install-bridge-libexec.sh
+# Then: sudo visudo -f /etc/sudoers.d/akoya-qemu-bridge
+Defaults!/usr/local/libexec/akoya/qemu-bridge-*.sh !env_keep
+%users ALL=(root) NOPASSWD: /usr/local/libexec/akoya/qemu-bridge-up.sh
+%users ALL=(root) NOPASSWD: /usr/local/libexec/akoya/qemu-bridge-down.sh

@@ -15,9 +15,17 @@ CC="${CC_PREFIX}gcc"
 LD="${CC_PREFIX}ld"
 OBJCOPY="${CC_PREFIX}objcopy"
 
+if ! command -v "${CC}" >/dev/null 2>&1 && [[ -z "${AKOYA_CROSS_PREFIX:-}" ]] && command -v gcc >/dev/null 2>&1; then
+    CC_PREFIX=""
+    CC="gcc"
+    LD="ld"
+    OBJCOPY="objcopy"
+fi
+
 MEM_LIMIT_MB="${AKOYA_BUILD_MEM_LIMIT_MB:-4096}"
 MEM_LIMIT_KB=$((MEM_LIMIT_MB * 1024))
 MEM_LIMIT_BYTES=$((MEM_LIMIT_MB * 1024 * 1024))
+PROBE_HOST="${AKOYA_PROBE_HOST:-google.com}"
 
 log() {
     printf '%s\n' "$*" | tee -a "${LOG_FILE}"
@@ -26,7 +34,7 @@ log() {
 emit_result() {
     local status="$1"
     local message="$2"
-  printf 'AKOYA_BUILD_RESULT=status=%s;kernel=%s;log=%s;message=%s\n' \
+    printf 'AKOYA_BUILD_RESULT=status=%s;kernel=%s;log=%s;message=%s\n' \
         "${status}" "${KERNEL_BIN}" "${LOG_FILE}" "${message}"
 }
 
@@ -40,6 +48,27 @@ resolve_build_id() {
     fi
 
     date -u +%Y%m%dT%H%M%SZ
+}
+
+resolve_probe_target() {
+    local ip=""
+    if command -v getent >/dev/null 2>&1; then
+        ip="$(getent ahostsv4 "${PROBE_HOST}" 2>/dev/null | awk 'NR==1 {print $1; exit}')"
+    fi
+    if [[ -z "${ip}" ]] && command -v python3 >/dev/null 2>&1; then
+        ip="$(python3 - <<PY
+import socket
+try:
+    print(socket.gethostbyname("${PROBE_HOST}"))
+except OSError:
+    pass
+PY
+)"
+    fi
+    if [[ -z "${ip}" ]]; then
+        ip="8.8.8.8"
+    fi
+    printf '%s' "${ip}"
 }
 
 toolchain_available() {
@@ -56,6 +85,15 @@ run_with_memory_limit() {
         )
     else
         "$@"
+    fi
+}
+
+compile_source() {
+    local source_path="$1"
+    local object_path="$2"
+    if ! run_with_memory_limit "${CC}" "${cflags[@]}" -c "${source_path}" -o "${object_path}" 2>&1 | tee -a "${LOG_FILE}"; then
+        emit_result "failure" "compile-error"
+        exit 1
     fi
 }
 
@@ -80,6 +118,13 @@ main() {
     build_id="$(resolve_build_id)"
     log "Build identity: ${build_id}"
 
+    local probe_ip probe_label
+    probe_ip="$(resolve_probe_target)"
+    probe_label="${PROBE_HOST}"
+    log "Probe target: ${probe_label} -> ${probe_ip}"
+
+    IFS='.' read -r probe_ip0 probe_ip1 probe_ip2 probe_ip3 <<< "${probe_ip}"
+
     local cflags=(
         -std=gnu99
         -ffreestanding
@@ -94,27 +139,39 @@ main() {
         -O2
         -I"${ROOT_DIR}/kernel"
         -DAKOYA_BUILD_ID=\"${build_id}\"
+        -DAKOYA_PROBE_TARGET_IP0="${probe_ip0}"
+        -DAKOYA_PROBE_TARGET_IP1="${probe_ip1}"
+        -DAKOYA_PROBE_TARGET_IP2="${probe_ip2}"
+        -DAKOYA_PROBE_TARGET_IP3="${probe_ip3}"
+        -DAKOYA_PROBE_TARGET_LABEL=\"${probe_label}\"
     )
 
-    local objects=(
-        "${BUILD_DIR}/entry.o"
-        "${BUILD_DIR}/console.o"
-        "${BUILD_DIR}/main.o"
+    local sources=(
+        "${ROOT_DIR}/kernel/boot/entry.S"
+        "${ROOT_DIR}/kernel/console/console.c"
+        "${ROOT_DIR}/kernel/pci/pci.c"
+        "${ROOT_DIR}/kernel/time/time.c"
+        "${ROOT_DIR}/kernel/net/eth/eth.c"
+        "${ROOT_DIR}/kernel/net/eth/rtl8139.c"
+        "${ROOT_DIR}/kernel/net/link/link.c"
+        "${ROOT_DIR}/kernel/net/ipv4/ipv4.c"
+        "${ROOT_DIR}/kernel/net/dhcp/dhcp.c"
+        "${ROOT_DIR}/kernel/net/icmp/icmp.c"
+        "${ROOT_DIR}/kernel/net/netmain.c"
+        "${ROOT_DIR}/kernel/main.c"
     )
+
+    local objects=()
+    local source object base
 
     log "Compiling with ${CC} (memory limit ${MEM_LIMIT_MB} MB)"
-    if ! run_with_memory_limit "${CC}" "${cflags[@]}" -c "${ROOT_DIR}/kernel/boot/entry.S" -o "${BUILD_DIR}/entry.o" 2>&1 | tee -a "${LOG_FILE}"; then
-        emit_result "failure" "compile-error"
-        exit 1
-    fi
-    if ! run_with_memory_limit "${CC}" "${cflags[@]}" -c "${ROOT_DIR}/kernel/console/console.c" -o "${BUILD_DIR}/console.o" 2>&1 | tee -a "${LOG_FILE}"; then
-        emit_result "failure" "compile-error"
-        exit 1
-    fi
-    if ! run_with_memory_limit "${CC}" "${cflags[@]}" -c "${ROOT_DIR}/kernel/main.c" -o "${BUILD_DIR}/main.o" 2>&1 | tee -a "${LOG_FILE}"; then
-        emit_result "failure" "compile-error"
-        exit 1
-    fi
+    for source in "${sources[@]}"; do
+        base="$(basename "${source}")"
+        base="${base%.*}"
+        object="${BUILD_DIR}/${base}.o"
+        objects+=("${object}")
+        compile_source "${source}" "${object}"
+    done
 
     log "Linking ${KERNEL_BIN}"
     if ! run_with_memory_limit "${LD}" -m elf_i386 -T "${ROOT_DIR}/linker.ld" -o "${BUILD_DIR}/kernel.elf" "${objects[@]}" 2>&1 | tee -a "${LOG_FILE}"; then
