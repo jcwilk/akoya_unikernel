@@ -46,7 +46,7 @@ The bootstrap image SHALL perform no application logic beyond initialization, co
 
 - **GIVEN** a correctly built bootstrap image
 - **WHEN** the interactive chat session is active
-- **THEN** network activity is limited to address acquisition, address reporting, a single connectivity probe, and HTTP chat-completion exchanges for submitted user lines
+- **THEN** network activity is limited to address acquisition, address reporting, a single connectivity probe against the configured chat/inference host, and HTTP chat-completion exchanges for submitted user lines
 - **AND** no listening servers or background retry loops continue outside active inference for a submitted line
 
 ### Requirement: Build identity in diagnostic output
@@ -58,4 +58,15 @@ The bootstrap diagnostic output SHALL include a build identity sufficient to con
 - **GIVEN** two bootstrap images produced by different build runs
 - **WHEN** each image boots and prints its diagnostic message
 - **THEN** an observer can tell the two builds apart from the emitted output alone
+
+### Requirement: Conversation-focused console handoff
+
+After IPv4 configuration succeeds, the bootstrap image SHALL transition the console to a conversation-focused presentation by clearing prior boot output before reachability verification and presenting subsequent chat interaction with minimal, dialogue-oriented formatting.
+
+#### Scenario: Chat session begins on a cleared display
+
+- **GIVEN** IPv4 configuration succeeded
+- **WHEN** the interactive chat session is about to accept operator input
+- **THEN** prior boot and network trace lines are not visible on the console display
+- **AND** the operator sees reachability confirmation followed by the minimal chat input prompt
 

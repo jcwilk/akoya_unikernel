@@ -61,7 +61,7 @@ The QEMU runner SHALL emulate 32-bit x86 execution consistent with the deploymen
 
 In headless mode, the run entry point SHALL attach emulated serial console output so bootstrap diagnostic messages are visible in the runner's standard output or log. In headful mode, console output SHALL remain observable through the display and/or serial attachment without requiring automated capture for pass/fail.
 
-In headless mode, captured output SHALL include the assigned IPv4 address line, the connectivity probe result line, and at least one chat-completion success line from the default or configured automated keyboard input sequence.
+In headless mode, captured output SHALL include a successful reachability result for the configured chat/inference host, plain assistant reply text from at least one inference exchange, and evidence that the minimal chat input prompt appeared during the scripted session.
 
 #### Scenario: Headless diagnostic message assertion
 
@@ -72,10 +72,11 @@ In headless mode, captured output SHALL include the assigned IPv4 address line, 
 #### Scenario: Headless network diagnostic assertion
 
 - **GIVEN** a correctly built bootstrap image
-- **AND** the workstation LAN provides DHCP and allows the connectivity probe to succeed
+- **AND** the workstation LAN provides DHCP
+- **AND** the configured chat/inference host responds to the connectivity probe
 - **WHEN** the run entry point completes successfully in headless mode
-- **THEN** the captured output contains the assigned IPv4 address reporting line
-- **AND** the captured output contains a successful connectivity probe result with latency
+- **THEN** the captured output contains a short human-readable line indicating the configured chat/inference host is reachable
+- **AND** the captured output does not require parsing key=value probe status framing to determine success
 
 #### Scenario: Headless chat-completion assertion
 
@@ -83,8 +84,8 @@ In headless mode, captured output SHALL include the assigned IPv4 address line, 
 - **AND** the workstation LAN provides DHCP
 - **AND** the configured chat-completions endpoint is reachable from the guest
 - **WHEN** the run entry point completes successfully in headless mode with default or configured scripted keyboard input
-- **THEN** the captured output contains a chat-completion success indicator
-- **AND** the captured output contains non-empty assistant reply text from at least one completion response
+- **THEN** the captured output contains non-empty assistant reply text from at least one completion response on its own line(s)
+- **AND** the captured output does not rely on key=value chat-completion status framing to identify a successful turn
 
 #### Scenario: Headful observation
 
@@ -263,7 +264,7 @@ In headless mode, the run entry point SHALL inject predetermined keystrokes into
 - **GIVEN** headless mode is selected and no custom input script is configured
 - **WHEN** the guest enters the interactive chat session and signals readiness for input
 - **THEN** the runner injects a default key sequence that submits at least one user message and then ends the session
-- **AND** captured output includes a successful chat-completion line from that exchange
+- **AND** captured output includes plain assistant reply text from that exchange
 
 #### Scenario: Custom scripted input
 
