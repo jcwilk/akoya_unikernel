@@ -2,8 +2,8 @@
 
 ## 1. Living spec reconciliation
 
-- [ ] 1.1 Replace `dev-test-runner` Purpose stub with text from `design.md` at archive
-- [ ] 1.2 Replace `unikernel-build-pipeline` Purpose stub with text from `design.md` at archive
+- [x] 1.1 Replace `dev-test-runner` Purpose stub with text from `design.md` at archive
+- [x] 1.2 Replace `unikernel-build-pipeline` Purpose stub with text from `design.md` at archive
 
 ## 2. Implementation alignment (verify existing branch work)
 
