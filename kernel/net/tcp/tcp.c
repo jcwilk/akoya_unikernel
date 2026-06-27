@@ -12,7 +12,8 @@
 #define TCP_FLAG_PSH 0x08U
 #define TCP_FLAG_ACK 0x10U
 
-#define TCP_CLOSE_DRAIN_MS 500U
+#define TCP_CLOSE_DRAIN_MS 2000U
+#define TCP_POST_BODY_DRAIN_MS 2000U
 
 struct tcp_header {
     uint16_t src_port;
@@ -41,6 +42,7 @@ static uint32_t conn_seq;
 static uint32_t conn_ack;
 static int conn_established;
 static int conn_remote_fin;
+static int conn_our_fin_sent;
 static int conn_reset;
 static uint8_t *recv_buf;
 static uint16_t recv_cap;
@@ -266,10 +268,44 @@ static void tcp_reset_flow_state(void)
     conn_ack = 0;
     conn_established = 0;
     conn_remote_fin = 0;
+    conn_our_fin_sent = 0;
     conn_reset = 0;
     recv_buf = 0;
     recv_cap = 0;
     recv_len = 0;
+}
+
+static void tcp_end_recv(void)
+{
+    recv_buf = 0;
+    recv_cap = 0;
+}
+
+static void tcp_quiesce_connection(uint32_t deadline_ms)
+{
+    if (!conn_established || conn_reset) {
+        return;
+    }
+
+    uint32_t deadline = time_millis() + deadline_ms;
+
+    if (!conn_our_fin_sent) {
+        (void)tcp_send_segment((uint8_t)(TCP_FLAG_FIN | TCP_FLAG_ACK), 0, 0);
+        conn_seq++;
+        conn_our_fin_sent = 1;
+    }
+
+    while (time_millis() < deadline) {
+        link_poll();
+        if (conn_reset) {
+            break;
+        }
+        if (conn_remote_fin && conn_our_fin_sent) {
+            break;
+        }
+    }
+
+    link_drain_rx(0);
 }
 
 int tcp_transport_inactive(void)
@@ -278,6 +314,7 @@ int tcp_transport_inactive(void)
         && !conn_established
         && !conn_reset
         && !conn_remote_fin
+        && !conn_our_fin_sent
         && recv_buf == 0
         && recv_len == 0
         && conn_local_port == 0
@@ -307,8 +344,6 @@ tcp_status_t tcp_session_open(
         return TCP_FAIL_CONNECT;
     }
 
-    link_drain_rx(512);
-
     conn_remote_ip = dest;
     conn_remote_port = dest_port;
     conn_local_port = tcp_alloc_local_port();
@@ -316,11 +351,13 @@ tcp_status_t tcp_session_open(
     conn_ack = 0;
     conn_established = 0;
     conn_remote_fin = 0;
+    conn_our_fin_sent = 0;
     conn_reset = 0;
     recv_buf = 0;
     recv_cap = 0;
     recv_len = 0;
 
+    link_drain_rx(0);
     tcp_register_handler();
 
     uint32_t deadline = time_millis() + timeout_ms;
@@ -392,6 +429,8 @@ tcp_status_t tcp_session_recv_until(
     tcp_begin_recv(buf, cap, len_out);
 
     uint32_t deadline = time_millis() + timeout_ms;
+    int body_complete = 0;
+    uint32_t body_complete_deadline = 0;
 
     while (time_millis() < deadline) {
         link_poll();
@@ -400,23 +439,40 @@ tcp_status_t tcp_session_recv_until(
             if (len_out != 0) {
                 *len_out = recv_len;
             }
+            tcp_end_recv();
             session->open = 0;
             tcp_unregister_handler();
             tcp_reset_flow_state();
             return TCP_FAIL_RECV;
         }
 
-        if (complete != 0 && complete(buf, recv_len, ctx)) {
-            if (len_out != 0) {
-                *len_out = recv_len;
+        if (!body_complete && complete != 0 && complete(buf, recv_len, ctx)) {
+            body_complete = 1;
+            body_complete_deadline = time_millis() + TCP_POST_BODY_DRAIN_MS;
+            tcp_end_recv();
+        }
+
+        if (body_complete) {
+            if (conn_remote_fin || conn_reset) {
+                if (len_out != 0) {
+                    *len_out = recv_len;
+                }
+                return TCP_OK;
             }
-            return TCP_OK;
+            if (time_millis() >= body_complete_deadline) {
+                if (len_out != 0) {
+                    *len_out = recv_len;
+                }
+                return TCP_OK;
+            }
+            continue;
         }
 
         if (conn_remote_fin) {
             if (len_out != 0) {
                 *len_out = recv_len;
             }
+            tcp_end_recv();
             session->open = 0;
             return TCP_OK;
         }
@@ -432,30 +488,25 @@ tcp_status_t tcp_session_recv_until(
 void tcp_session_close(tcp_session_t *session)
 {
     if (session == 0) {
+        tcp_quiesce_connection(TCP_CLOSE_DRAIN_MS);
         tcp_unregister_handler();
+        link_drain_rx(0);
         tcp_reset_flow_state();
         return;
     }
 
     if (!session->open) {
         tcp_unregister_handler();
+        link_drain_rx(0);
         tcp_reset_flow_state();
         session->open = 0;
         return;
     }
 
-    if (conn_established && !conn_reset) {
-        (void)tcp_send_segment(TCP_FLAG_FIN | TCP_FLAG_ACK, 0, 0);
-        conn_seq++;
-
-        uint32_t close_deadline = time_millis() + TCP_CLOSE_DRAIN_MS;
-        while (time_millis() < close_deadline) {
-            link_poll();
-        }
-    }
+    tcp_quiesce_connection(TCP_CLOSE_DRAIN_MS);
 
     tcp_unregister_handler();
-    link_drain_rx(512);
+    link_drain_rx(0);
     tcp_reset_flow_state();
     session->open = 0;
 }
