@@ -3,12 +3,8 @@
 
 identity:
   marketing_name: Medion Akoya EX
-  medion_model_number: MD95335
-  internal_designation: MIM2060
   sources:
     - ryanbetz-notebookreview-review-2009-03-01.md
-    - offtek-md95335-memory-specs.md
-    - howtomendit-mim2060-ram-2010.md
 
 form_factor:
   class: notebook
@@ -40,19 +36,14 @@ chipset:
 
 memory:
   default_installed_mb: 512
-  maximum_mb: 1024
+  maximum_mb: 2048
   slots: 2
-  module_size_max_mb: 512
+  module_size_max_mb: 1024
   type: DDR
-  form_factor: 200-pin SO-DIMM
-  speed: PC2700
-  speed_mhz: 333
-  voltage_v: 2.5
-  ecc: false
+  form_factor: SO-DIMM
   sources:
     - ryanbetz-notebookreview-review-2009-03-01.md
-    - offtek-md95335-memory-specs.md
-    - howtomendit-mim2060-ram-2010.md
+    - intel-855gm-gmch-memory-capacity.md
 
 display:
   size_inches: 14.1
