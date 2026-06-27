@@ -25,11 +25,15 @@
 #endif
 
 #ifndef AKOYA_CHAT_MODEL
-#define AKOYA_CHAT_MODEL "default"
+#define AKOYA_CHAT_MODEL "fast-text-qwen3-8b"
 #endif
 
 #ifndef AKOYA_CHAT_TIMEOUT_MS
 #define AKOYA_CHAT_TIMEOUT_MS 60000U
+#endif
+
+#ifndef AKOYA_CHAT_PORT
+#define AKOYA_CHAT_PORT 11435
 #endif
 
 #define HTTP_CHAT_RECV_CAP 4096U
@@ -227,8 +231,38 @@ static int build_request(char *buf, int cap, int *len_out)
     }
     json[json_len] = '\0';
 
-    char host[16];
+    char host[24];
     format_host_ip(host, (int)sizeof(host));
+    if (AKOYA_CHAT_PORT != 80) {
+        char port_suffix[8];
+        int port = AKOYA_CHAT_PORT;
+        int port_idx = 0;
+        if (port == 0) {
+            port_suffix[0] = '0';
+            port_suffix[1] = '\0';
+        } else {
+            char tmp[8];
+            int tmp_idx = 0;
+            while (port > 0 && tmp_idx < (int)sizeof(tmp) - 1) {
+                tmp[tmp_idx++] = (char)('0' + (port % 10));
+                port /= 10;
+            }
+            port_suffix[0] = ':';
+            port_idx = 1;
+            while (tmp_idx > 0 && port_idx < (int)sizeof(port_suffix) - 1) {
+                port_suffix[port_idx++] = tmp[--tmp_idx];
+            }
+            port_suffix[port_idx] = '\0';
+        }
+        int host_len = 0;
+        while (host[host_len] != '\0') {
+            host_len++;
+        }
+        for (int p = 0; port_suffix[p] != '\0' && host_len + 1 < (int)sizeof(host); p++) {
+            host[host_len++] = port_suffix[p];
+        }
+        host[host_len] = '\0';
+    }
 
     char len_str[8];
     int len_val = json_len;
@@ -305,7 +339,7 @@ http_chat_status_t http_chat_probe(void)
 
     tcp_status_t tcp_status = tcp_connect_send_recv(
         host,
-        80,
+        (uint16_t)AKOYA_CHAT_PORT,
         (const uint8_t *)request,
         (uint16_t)request_len,
         response,

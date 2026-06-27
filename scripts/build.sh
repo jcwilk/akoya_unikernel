@@ -29,8 +29,9 @@ PROBE_HOST="${AKOYA_PROBE_HOST:-google.com}"
 CHAT_HOST_IP="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
 CHAT_PATH="${AKOYA_CHAT_PATH:-/v1/chat/completions}"
 CHAT_USER_MSG="${AKOYA_CHAT_USER_MSG:-hi}"
-CHAT_MODEL="${AKOYA_CHAT_MODEL:-default}"
+CHAT_MODEL="${AKOYA_CHAT_MODEL:-fast-text-qwen3-8b}"
 CHAT_TIMEOUT_MS="${AKOYA_CHAT_TIMEOUT_MS:-60000}"
+CHAT_PORT="${AKOYA_CHAT_PORT:-11435}"
 
 log() {
     printf '%s\n' "$*" | tee -a "${LOG_FILE}"
@@ -160,6 +161,7 @@ main() {
         -DAKOYA_CHAT_USER_MSG=\"${CHAT_USER_MSG}\"
         -DAKOYA_CHAT_MODEL=\"${CHAT_MODEL}\"
         -DAKOYA_CHAT_TIMEOUT_MS="${CHAT_TIMEOUT_MS}"
+        -DAKOYA_CHAT_PORT="${CHAT_PORT}"
     )
 
     local sources=(

@@ -9,7 +9,7 @@ QEMU_BIN="${AKOYA_QEMU_BIN:-qemu-system-i386}"
 TIMEOUT_SEC="${AKOYA_QEMU_TIMEOUT_SEC:-180}"
 BOOT_MESSAGE="${AKOYA_BOOTSTRAP_MESSAGE:-akoya_unikernel bootstrap ok}"
 CHAT_HOST="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
-CHAT_PORT="${AKOYA_CHAT_PORT:-80}"
+CHAT_PORT="${AKOYA_CHAT_PORT:-11435}"
 GUEST_MAC="${AKOYA_QEMU_GUEST_MAC:-52:54:00:12:34:56}"
 MACVTAP_IF="${AKOYA_QEMU_TAP_IF:-akoya-qemu0}"
 LAN_IF="${AKOYA_QEMU_LAN_IF:-enx00e04c6801e8}"
@@ -42,7 +42,7 @@ Environment:
   AKOYA_QEMU_GUEST_MAC    Fixed guest MAC (default: 52:54:00:12:34:56)
   AKOYA_QEMU_TIMEOUT_SEC  Headless timeout (default: 180)
   AKOYA_CHAT_HOST_IP       Chat endpoint host for pre-flight (default: 192.168.1.110)
-  AKOYA_CHAT_PORT          Chat endpoint port for pre-flight (default: 80)
+  AKOYA_CHAT_PORT          Chat endpoint port for pre-flight (default: 11435)
   AKOYA_AUTO_LAN          1 = macvtap up/down around each run (default: 1)
   AKOYA_LAN_LIBEXEC       Installed helper scripts for passwordless sudo (default: /usr/local/libexec/akoya)
 
