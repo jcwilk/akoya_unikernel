@@ -4,10 +4,10 @@ The Akoya EX hardware inventory now documents a 10/100 Mbit Ethernet interface, 
 
 ## What Changes
 
-- Extend the bootstrap unikernel to bring up Ethernet, obtain an IPv4 address via DHCP, print the assigned address, and send one ICMP echo request to a well-known public host, reporting success or failure and round-trip latency on the console.
+- Replace the console-only bootstrap with a single always-network bootstrap image that brings up Ethernet, obtains an IPv4 address via DHCP, prints the assigned address, and sends one ICMP echo request to a well-known public host, reporting success or failure and round-trip latency on the console.
 - Introduce a modular in-kernel network stack layout (link layer, IPv4, DHCP client, ICMP) so drivers and protocols can evolve independently.
-- Update the development-workstation QEMU runner to attach an emulated NIC bridged to the workstation's LAN, using a fixed guest MAC address so repeated runs do not exhaust DHCP leases.
-- Extend headless smoke-test expectations to cover the new network diagnostic console output when network mode is enabled.
+- Require the development-workstation QEMU runner—headless and headful—to attach an emulated NIC bridged to the workstation's physical LAN on every invocation, so the guest talks directly to the same router and DHCP server as the workstation. Use a fixed guest MAC address so repeated runs do not exhaust DHCP leases.
+- Extend smoke-test expectations so all run paths assert network diagnostic console output (assigned address and connectivity probe result) in addition to the bootstrap message.
 - Keep wireless, DNS resolution beyond what DHCP provides, TCP, and persistent storage out of scope for this iteration.
 
 ## Capabilities
@@ -18,14 +18,14 @@ The Akoya EX hardware inventory now documents a 10/100 Mbit Ethernet interface, 
 
 ### Modified Capabilities
 
-- `bootstrap-unikernel`: Expand bootstrap scope beyond console-only diagnostics to include the network sequence while preserving build identity and orderly completion behavior.
-- `dev-test-runner`: Add bridged Ethernet emulation with a stable guest MAC and automated assertions for network diagnostic output in headless mode.
-- `deployment-target`: Relax the "no network required" conservative assumption so the deployment profile explicitly allows Ethernet-based bootstrap behavior on target-class hardware.
+- `bootstrap-unikernel`: Bootstrap always includes the network diagnostic sequence after the initial console message; no console-only build flavor.
+- `dev-test-runner`: Mandatory bridged Ethernet on every run mode (headless and headful), stable guest MAC, and automated assertions for network diagnostic output.
+- `deployment-target`: Deployment profile assumes wired Ethernet and DHCP are required for bootstrap diagnostic completion on target-class hardware.
 
 ## Impact
 
 - New kernel modules under a dedicated network source tree (driver, link layer, IPv4, DHCP, ICMP, orchestration).
-- Changes to the main bootstrap entry flow and build wiring.
-- QEMU runner script gains bridged networking, fixed MAC configuration, and extended smoke-test patterns.
-- Documentation updates for network smoke testing prerequisites (host bridge permissions, DHCP on the LAN).
+- Bootstrap entry flow always runs the network sequence; console-only code path removed.
+- QEMU runner always uses bridged networking to the workstation LAN; user-mode or NAT-only networking is not a supported run path.
+- Documentation updates for bridge setup prerequisites (host bridge permissions, DHCP on the LAN).
 - No changes to living hardware-inventory provenance rules; Ethernet speed facts already recorded remain the hardware basis for targeting wired LAN only.

@@ -2,7 +2,7 @@
 
 ### Requirement: Wired Ethernet bring-up
 
-The network-enabled bootstrap image SHALL initialize the wired Ethernet interface and report link readiness on the console before attempting IP configuration.
+The bootstrap image SHALL initialize the wired Ethernet interface and report link readiness on the console before attempting IP configuration.
 
 #### Scenario: Link ready before DHCP
 
@@ -20,7 +20,7 @@ The network-enabled bootstrap image SHALL initialize the wired Ethernet interfac
 
 ### Requirement: IPv4 address via DHCP
 
-The network-enabled bootstrap image SHALL obtain an IPv4 address, subnet mask, and default gateway using DHCP on the wired interface.
+The bootstrap image SHALL obtain an IPv4 address, subnet mask, and default gateway using DHCP on the wired interface.
 
 #### Scenario: Successful lease
 
@@ -37,7 +37,7 @@ The network-enabled bootstrap image SHALL obtain an IPv4 address, subnet mask, a
 
 ### Requirement: Assigned address reporting
 
-After successful DHCP, the network-enabled bootstrap image SHALL print the assigned IPv4 address on the console in a single, human-readable line before any connectivity probe.
+After successful DHCP, the bootstrap image SHALL print the assigned IPv4 address on the console in a single, human-readable line before any connectivity probe.
 
 #### Scenario: Address visible after lease
 
@@ -48,7 +48,7 @@ After successful DHCP, the network-enabled bootstrap image SHALL print the assig
 
 ### Requirement: Single outbound connectivity probe
 
-After reporting its IPv4 address, the network-enabled bootstrap image SHALL send exactly one ICMP echo request to a configured connectivity target and await a reply or failure within a bounded time.
+After reporting its IPv4 address, the bootstrap image SHALL send exactly one ICMP echo request to a configured connectivity target and await a reply or failure within a bounded time.
 
 #### Scenario: Probe succeeds
 
@@ -67,7 +67,7 @@ After reporting its IPv4 address, the network-enabled bootstrap image SHALL send
 
 ### Requirement: Orderly completion after network diagnostics
 
-The network-enabled bootstrap image SHALL finish its boot-time work after emitting network diagnostics and then enter an orderly halt or idle loop without starting additional services.
+The bootstrap image SHALL finish its boot-time work after emitting network diagnostics and then enter an orderly halt or idle loop without starting additional services.
 
 #### Scenario: No follow-on traffic
 

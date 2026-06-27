@@ -2,20 +2,22 @@
 
 The repository ships a minimal i686 multiboot bootstrap kernel with serial/VGA console output and a QEMU smoke-test runner. Hardware inventory confirms the Medion Akoya EX has 10/100 Mbit Ethernet (RJ-45) but does not yet identify the exact NIC controller chip. The bootstrap image currently halts after printing a fixed diagnostic string; no network code exists.
 
-The human wants the next increment to exercise real DHCP and TCP/IP on both emulated and bare-metal paths, with modular structure for later protocols and drivers.
+The human wants the next increment to exercise real DHCP and TCP/IP on both emulated and bare-metal paths, with modular structure for later protocols and drivers. The bootstrap image SHALL always be network-capable, and every development-workstation run path SHALL bridge the guest to the workstation's physical NIC so traffic reaches the same LAN router and DHCP server as the host.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Bring up wired Ethernet, complete DHCP for IPv4, print the leased address, and perform one ICMP echo (ping) to a configured public host, reporting reachability and round-trip time on the console.
+- Single always-network bootstrap image: bring up wired Ethernet, complete DHCP for IPv4, print the leased address, and perform one ICMP echo (ping) to a configured public host, reporting reachability and round-trip time on the console.
 - Organize kernel networking as layered modules with narrow interfaces (NIC driver ↔ link layer ↔ IPv4 ↔ DHCP ↔ ICMP ↔ bootstrap orchestration).
-- Extend the QEMU runner so the guest NIC is bridged to the development workstation LAN with a fixed guest MAC address.
-- Extend headless smoke tests to assert the network diagnostic lines when network bootstrap is the active image mode.
-- Preserve existing console-only bootstrap behavior as a compile-time or build-flavor option if practical, so pipeline regressions remain cheap when network is not under test.
+- Require bridged emulation on every QEMU invocation—headless and headful—so the guest NIC is on the workstation LAN with a fixed guest MAC address.
+- Extend smoke tests so all run paths assert network diagnostic lines.
+- Retain the initial bootstrap console message before any network activity begins.
 
 **Non-Goals:**
 
+- Console-only bootstrap build flavor or optional network disable switch.
+- User-mode NAT, slirp, or other run paths that do not bridge the guest to the workstation LAN.
 - Wireless (Intel PRO/Wireless 2200BG), modem, Bluetooth, or IrDA.
 - DNS client beyond whatever DHCP supplies for the probe target (the probe target MAY be a fixed IPv4 address resolved at build time to avoid a DNS stack).
 - TCP, UDP sockets API, HTTP, or persistent connections.
@@ -70,24 +72,25 @@ The human wants the next increment to exercise real DHCP and TCP/IP on both emul
 
 **Rationale:** Prevents DHCP pool churn during repeated agent/human test loops.
 
-### 5. QEMU bridged networking on the workstation
+### 5. Mandatory bridged networking on every run path
 
-**Choice:** Attach the emulated NIC with `-netdev bridge,id=...,br=<bridge>` (or equivalent tap+bridge helper script) so DHCP requests reach the same LAN as the workstation. Provide setup notes for creating/using a bridge (may require elevated privileges once).
+**Choice:** Every QEMU invocation—headless smoke test and headful interactive session—attaches the emulated NIC with `-netdev bridge,id=...,br=<bridge>` (or equivalent tap+bridge helper) bridged to the workstation's physical LAN interface. The guest MUST reach the same router and DHCP server as the workstation. No user-mode NAT (`-netdev user`) or slirp fallback.
 
-**Rationale:** User-mode NAT (`-netdev user`) would not exercise real DHCP behavior on the LAN; slirp/user networking hides differences that matter before bare metal.
+**Rationale:** The human requires direct LAN interaction (router, DHCP) on all run paths; NAT would hide real network behavior and is explicitly out of scope.
 
 **Alternatives considered:**
 
 | Option | Why not now |
 |--------|-------------|
-| `-netdev user` with built-in DHCP | Does not match real LAN DHCP; poor stepping stone |
+| `-netdev user` with built-in DHCP | Does not reach the workstation router; rejected by intent |
+| Bridge only for headless / NAT for headful | Violates always-bridged requirement |
 | macvtap-only without docs | Less portable across distros; bridge + helper script is clearer |
 
 ### 6. Extended headless timeout for network bootstrap
 
-**Choice:** Increase default headless timeout when network diagnostics are expected (DHCP + ping may take tens of seconds). Keep separate, shorter timeout for console-only bootstrap flavor if retained.
+**Choice:** Increase default headless timeout to account for DHCP negotiation and the connectivity probe (tens of seconds). Headful mode retains manual session control without an automated pass/fail timeout gate.
 
-**Rationale:** Existing 30s ceiling may be tight on slow DHCP servers.
+**Rationale:** Existing 30s ceiling may be tight on slow DHCP servers; network diagnostics are now always on the critical path.
 
 ### 7. Console diagnostic format (stable tokens)
 
@@ -98,34 +101,47 @@ The human wants the next increment to exercise real DHCP and TCP/IP on both emul
 
 **Rationale:** Headless runner can grep predictable tokens without fragile free-text parsing.
 
+### 8. Single always-network bootstrap image
+
+**Choice:** Remove the console-only bootstrap path. Every build of the bootstrap image includes the network stack and runs the full diagnostic sequence after the initial console message.
+
+**Rationale:** Matches human intent; avoids dual maintenance and ambiguous `make test` behavior.
+
+**Alternatives considered:**
+
+| Option | Why not now |
+|--------|-------------|
+| Dual build flavors (console vs network) | Adds complexity; human chose always-network |
+
 ## Risks / Trade-offs
 
 | Risk | Mitigation |
 |------|------------|
 | Unknown bare-metal NIC controller | Ship emulation path first; document blocker for hardware driver; do not invent inventory facts |
 | Bridge setup requires root/CAP_NET_ADMIN | Document one-time setup; runner fails fast with actionable message if bridge missing |
-| CI or sandbox lacks bridged LAN | Headless network smoke test is workstation-local acceptance; defer CI until environment policy exists |
+| Headful runs also require bridge setup | Same bridge prerequisites for all modes; document clearly |
+| CI or sandbox lacks bridged LAN | Smoke test is workstation-local acceptance; defer CI until environment policy exists |
 | DHCP server absent or slow | Bounded DHCP wait with clear console failure; runner timeout accounts for wait |
 | ICMP blocked on some LANs | Console reports `status=fail`; smoke test documents that outbound ICMP must be allowed for pass |
 | google.com address changes | Build-time resolution; rebuild refreshes target; optional override via build env |
 
 ## Migration Plan
 
-Incremental extension — no breaking change to build entry points.
+Breaking behavioral change for bootstrap and test runner: console-only smoke path is replaced by always-network + always-bridged.
 
 **Apply sequence:**
 
 1. Add `kernel/net/` module skeleton and build wiring.
-2. Implement emulated NIC driver + DHCP + ICMP path; wire into `kernel_main`.
-3. Extend `scripts/run-qemu.sh` for bridge netdev + fixed MAC + network log assertions.
-4. Update README with bridge prerequisites and network smoke-test expectations.
-5. Verify `make build && make test` (or dedicated `make test-net`) on a bridged workstation.
-6. Document bare-metal Ethernet checklist (cable, DHCP on LAN, expected console lines) without automating deploy.
+2. Implement emulated NIC driver + DHCP + ICMP path; wire into `kernel_main` as the sole bootstrap path.
+3. Replace `scripts/run-qemu.sh` networking so every invocation uses bridge netdev + fixed MAC + network log assertions.
+4. Remove console-only bootstrap code and any runner paths that omit bridging.
+5. Update README with mandatory bridge prerequisites and expected console output.
+6. Verify `make build && make test` on a bridged workstation.
+7. Document bare-metal Ethernet checklist (cable, DHCP on LAN, expected console lines) without automating deploy.
 
-**Rollback:** Revert apply branch; console-only bootstrap remains available if dual-flavor build is kept.
+**Rollback:** Revert apply branch; restores prior console-only bootstrap and non-bridged runner.
 
 ## Open Questions
 
 - Exact Akoya EX Ethernet controller (PCI ID / MMIO vs port I/O) — resolve when hardware is observed.
 - Preferred bridge name on the development workstation (`br0`, `virbr0`, distro default).
-- Whether to keep console-only and network images as separate build targets or one always-network image for v1.

@@ -2,7 +2,7 @@
 
 ### Requirement: Console output without external dependencies
 
-The bootstrap image SHALL produce its initial diagnostic message using only bootstrapped console facilities available immediately after kernel handoff, without relying on filesystem mounts or user interaction. Network services MAY be used only after that initial message is emitted and only when the built image is the network-enabled bootstrap variant.
+The bootstrap image SHALL produce its initial diagnostic message using only bootstrapped console facilities available immediately after kernel handoff, without relying on filesystem mounts or user interaction. Network services SHALL be used only after that initial message is emitted.
 
 #### Scenario: Standalone console-first boot
 
@@ -10,15 +10,15 @@ The bootstrap image SHALL produce its initial diagnostic message using only boot
 - **WHEN** the bootstrap image starts
 - **THEN** the initial diagnostic message is still emitted to console output before any network initialization begins
 
-#### Scenario: Network variant defers remote services
+#### Scenario: Network follows initial message
 
-- **GIVEN** the network-enabled bootstrap variant
+- **GIVEN** a correctly built bootstrap image
 - **WHEN** the image starts
 - **THEN** the initial diagnostic message appears before DHCP or connectivity probes run
 
 ### Requirement: Deterministic bootstrap scope
 
-The bootstrap image SHALL perform no application logic beyond initialization, console setup, emitting diagnostic output (including network diagnostics when the network-enabled variant is built), and an orderly halt or idle loop.
+The bootstrap image SHALL perform no application logic beyond initialization, console setup, emitting diagnostic output (including network diagnostics), and an orderly halt or idle loop.
 
 #### Scenario: No hidden side effects
 
@@ -30,7 +30,7 @@ The bootstrap image SHALL perform no application logic beyond initialization, co
 
 #### Scenario: Network scope bounded to diagnostics
 
-- **GIVEN** the network-enabled bootstrap variant
+- **GIVEN** a correctly built bootstrap image
 - **WHEN** boot completes
 - **THEN** network activity is limited to address acquisition, address reporting, and a single connectivity probe
 - **AND** no listening servers or background retry loops continue after diagnostics finish

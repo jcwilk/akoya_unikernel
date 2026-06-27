@@ -14,22 +14,22 @@
 
 ## 3. Bootstrap integration
 
-- [ ] 3.1 Extend `kernel/main.c` (or network orchestration entry) to run: initial bootstrap message → link bring-up → DHCP → print assigned address → connectivity probe → orderly halt
-- [ ] 3.2 Preserve console-only bootstrap as a build flavor or flag so existing smoke path remains available without bridged networking
+- [ ] 3.1 Replace console-only bootstrap flow in `kernel/main.c` with always-network sequence: initial bootstrap message → link bring-up → DHCP → print assigned address → connectivity probe → orderly halt
+- [ ] 3.2 Remove console-only bootstrap build flavor, flags, and dead code paths
 
 ## 4. QEMU runner and smoke test
 
-- [ ] 4.1 Extend `scripts/run-qemu.sh` to attach bridged `-netdev` for network bootstrap images with project-fixed guest MAC
+- [ ] 4.1 Require bridged `-netdev` on every `scripts/run-qemu.sh` invocation (headless and headful) with project-fixed guest MAC; remove user-mode/NAT/slirp run paths
 - [ ] 4.2 Fail fast when bridge/prerequisites are missing, with actionable error text
-- [ ] 4.3 Extend headless assertions to require bootstrap message, `net_ip=` line, and successful `net_ping=` line when network mode is active
-- [ ] 4.4 Increase default headless timeout for network bootstrap runs; keep shorter timeout for console-only flavor
-- [ ] 4.5 Add Makefile target (e.g. `test-net`) or document when `make test` exercises network vs console-only
+- [ ] 4.3 Extend headless assertions to require bootstrap message, `net_ip=` line, and successful `net_ping=` line
+- [ ] 4.4 Increase default headless timeout for DHCP + connectivity probe
+- [ ] 4.5 Ensure `make test` always exercises the bridged always-network bootstrap (no separate `test-net` target unless documented as alias only)
 
 ## 5. Documentation and workstation acceptance
 
-- [ ] 5.1 Update `README.md` with bridge setup prerequisites, fixed MAC note, and expected console output for network smoke test
+- [ ] 5.1 Update `README.md` with mandatory bridge setup, fixed MAC note, and expected console output for smoke test on all run modes
 - [ ] 5.2 Document bare-metal Ethernet checklist (RJ-45, LAN DHCP, ICMP allowance) without automating deploy
-- [ ] 5.3 Run `make build` and network headless smoke test on development workstation with bridged LAN; capture evidence (log path, pass/fail) for apply handoff
+- [ ] 5.3 Run `make build && make test` on development workstation with bridged LAN; capture evidence (log path, pass/fail) for apply handoff
 
 ## Explicitly deferred
 
