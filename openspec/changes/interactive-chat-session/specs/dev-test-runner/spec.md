@@ -4,7 +4,7 @@
 
 In headless mode, the run entry point SHALL attach emulated serial console output so bootstrap diagnostic messages are visible in the runner's standard output or log. In headful mode, console output SHALL remain observable through the display and/or serial attachment without requiring automated capture for pass/fail.
 
-In headless mode, captured output SHALL include the assigned IPv4 address line, the connectivity probe result line, and at least one chat-completion success line from the scripted or default automated input sequence.
+In headless mode, captured output SHALL include the assigned IPv4 address line, the connectivity probe result line, and at least one chat-completion success line from the default or configured automated keyboard input sequence.
 
 #### Scenario: Headless diagnostic message assertion
 
@@ -25,7 +25,7 @@ In headless mode, captured output SHALL include the assigned IPv4 address line, 
 - **GIVEN** a correctly built bootstrap image
 - **AND** the workstation LAN provides DHCP
 - **AND** the configured chat-completions endpoint is reachable from the guest
-- **WHEN** the run entry point completes successfully in headless mode with default or configured scripted serial input
+- **WHEN** the run entry point completes successfully in headless mode with default or configured scripted keyboard input
 - **THEN** the captured output contains a chat-completion success indicator
 - **AND** the captured output contains non-empty assistant reply text from at least one completion response
 
@@ -34,13 +34,13 @@ In headless mode, captured output SHALL include the assigned IPv4 address line, 
 - **GIVEN** a correctly built bootstrap image
 - **WHEN** the run entry point is invoked in headful mode
 - **THEN** an observer can read bootstrap, network, and interactive chat output from the interactive session without relying on automated pass/fail gating
-- **AND** the observer can type follow-up messages using US keyboard layout input on the console
+- **AND** the operator can type follow-up messages on the emulated deployment-target integrated keyboard path
 
 ### Requirement: Bounded test runtime
 
 In headless mode, the run entry point SHALL terminate within a bounded time when the image fails to produce expected diagnostic output, rather than hanging indefinitely. Headful mode SHALL NOT apply the same automated timeout gate.
 
-The bounded time SHALL account for DHCP negotiation, the connectivity probe, scripted interactive chat input, and at least one chat-completion HTTP exchange in addition to console bring-up.
+The bounded time SHALL account for DHCP negotiation, the connectivity probe, scripted keyboard-driven chat input, and at least one chat-completion HTTP exchange in addition to console bring-up.
 
 #### Scenario: Headless boot hang detection
 
@@ -68,7 +68,7 @@ The caller SHALL be able to override the default for either display mode with an
 
 - **GIVEN** a successful bootstrap build
 - **WHEN** the run entry point is invoked in headless mode without a shutdown-behavior override
-- **THEN** the emulator exits after scripted chat input produces expected diagnostic output and the guest halts
+- **THEN** the emulator exits after scripted keyboard input produces expected diagnostic output and the guest halts
 - **AND** the invocation can be used as an automated smoke test
 
 #### Scenario: Headful default hold-open
@@ -82,7 +82,7 @@ The caller SHALL be able to override the default for either display mode with an
 
 - **GIVEN** a caller requests hold-open shutdown behavior on a headless invocation
 - **WHEN** the run entry point starts emulation
-- **THEN** the emulator does not automatically exit solely because the guest halted before scripted input completed
+- **THEN** the emulator does not automatically exit solely because the guest halted before scripted keyboard input completed
 
 #### Scenario: Override to auto-exit on headful
 
@@ -92,20 +92,20 @@ The caller SHALL be able to override the default for either display mode with an
 
 ## ADDED Requirements
 
-### Requirement: Scripted serial input for headless smoke tests
+### Requirement: Scripted keyboard input for headless smoke tests
 
-In headless mode, the run entry point SHALL supply predetermined console input to the guest serial interface so automated runs can complete at least one chat exchange without physical keyboard input.
+In headless mode, the run entry point SHALL inject predetermined keystrokes into the guest emulated deployment-target keyboard path so automated runs complete at least one chat exchange without physical keyboard input. Injection SHALL use the same guest keyboard input stack exercised on bare metal, not serial console receive as a substitute keyboard.
 
 #### Scenario: Default scripted chat input
 
 - **GIVEN** headless mode is selected and no custom input script is configured
-- **WHEN** the guest enters the interactive chat session
-- **THEN** the runner feeds a default input sequence that submits at least one user message and then ends the session
+- **WHEN** the guest enters the interactive chat session and signals readiness for input
+- **THEN** the runner injects a default key sequence that submits at least one user message and then ends the session
 - **AND** captured output includes a successful chat-completion line from that exchange
 
 #### Scenario: Custom scripted input
 
-- **GIVEN** headless mode with a configured multi-line input script
-- **WHEN** the guest accepts serial input
-- **THEN** the runner feeds the configured lines in order
-- **AND** each line is available to the guest as if typed by an operator
+- **GIVEN** headless mode with a configured multi-line keyboard input script
+- **WHEN** the guest accepts keyboard input
+- **THEN** the runner injects the configured key sequences in order
+- **AND** each sequence is delivered through the emulated integrated keyboard path as if typed by an operator

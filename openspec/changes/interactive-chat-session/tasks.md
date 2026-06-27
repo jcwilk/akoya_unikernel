@@ -2,11 +2,12 @@
 
 ## Required for this change
 
-## 1. Console keyboard input
+## 1. PS/2 integrated keyboard input (Akoya-class path)
 
-- [ ] 1.1 Add serial (or equivalent) receive path for console input with US-layout printable ASCII, Backspace, and Enter handling
-- [ ] 1.2 Echo edited input line to console; ignore empty submissions
-- [ ] 1.3 Recognize exit commands (`quit` / `exit`, case-insensitive) without sending inference
+- [ ] 1.1 Add i8042 PS/2 keyboard controller driver—the standard integrated keyboard path for Pentium M / ICH-era notebooks including Akoya EX
+- [ ] 1.2 Decode scan codes to US-layout printable ASCII, Backspace, and Enter for line editing
+- [ ] 1.3 Echo edited input line to console; ignore empty submissions
+- [ ] 1.4 Recognize exit commands (`quit` / `exit`, case-insensitive) without sending inference
 
 ## 2. Conversation history
 
@@ -22,29 +23,31 @@
 
 ## 4. Interactive session orchestration
 
-- [ ] 4.1 Replace one-shot `http_chat_probe()` with session loop: prompt → read line → infer → print → repeat until exit
+- [ ] 4.1 Replace one-shot `http_chat_probe()` with session loop: prompt → read line from keyboard driver → infer → print → repeat until exit
 - [ ] 4.2 Run session only after successful network diagnostics; skip when DHCP/ping failed
 - [ ] 4.3 Halt cleanly after session exit (preserve QEMU debug exit path)
 
 ## 5. Dev test runner
 
-- [ ] 5.1 Attach bidirectional serial in headless mode; default script `hi` + exit command
-- [ ] 5.2 Support `AKOYA_CHAT_SCRIPT` or equivalent for custom scripted input
+- [ ] 5.1 Headless: inject default scripted keystrokes into emulated PS/2 keyboard (e.g. QEMU monitor `sendkey`), not serial stdin as fake keyboard
+- [ ] 5.2 Support `AKOYA_CHAT_SCRIPT` or equivalent for custom keyboard injection scripts
 - [ ] 5.3 Adjust headless timeout for scripted chat; keep chat endpoint pre-flight assertion
-- [ ] 5.4 Headful: ensure keyboard input reaches guest serial/console path
+- [ ] 5.4 Headful: verify SDL key events reach guest i8042 path (same driver as bare metal)
 
 ## 6. Documentation
 
-- [ ] 6.1 Update README: interactive chat usage, US keyboard, exit commands, history behavior, scripted headless input
+- [ ] 6.1 Update README: integrated keyboard input (PS/2 path), US layout, exit commands, history behavior, headless keyboard injection
 
 ## 7. Build and acceptance
 
 - [ ] 7.1 `make build` succeeds
-- [ ] 7.2 `make test` passes with scripted headless input and reachable chat endpoint
+- [ ] 7.2 `make test` passes with scripted keyboard input and reachable chat endpoint
 
 ## Explicitly deferred
 
-- PS/2 keyboard driver for bare-metal without serial console
+- USB HID external keyboard support
 - Non-US keyboard layouts and Unicode beyond 7-bit ASCII
+- Touchpad/mouse as chat input
 - TLS, streaming, DNS, persistent conversation storage
+- Hardware inventory update confirming i8042 on Akoya (optional follow-on when machine observed)
 - Multi-turn requirements in automated smoke beyond default script (custom script is optional enhancement)

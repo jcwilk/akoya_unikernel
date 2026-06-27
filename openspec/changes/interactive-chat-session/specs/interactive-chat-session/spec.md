@@ -1,27 +1,38 @@
 ## ADDED Requirements
 
-### Requirement: US keyboard console input
+### Requirement: Integrated keyboard input on deployment target
 
-After network diagnostics complete, the image SHALL accept operator input from the console keyboard using US keyboard layout semantics for the interactive chat session.
+On bare metal matching the Medion Akoya EX deployment profile, the interactive chat session SHALL accept operator input from the notebook integrated keyboard without requiring an external USB keyboard or serial console as the typing device.
+
+#### Scenario: Built-in keyboard on target hardware
+
+- **GIVEN** the image boots on Akoya-class bare metal with integrated keyboard
+- **WHEN** the operator enters the interactive chat session
+- **THEN** key presses on the built-in keyboard produce input for the pending chat line
+- **AND** typing does not depend on attaching an external serial terminal for input
+
+### Requirement: US keyboard layout from key events
+
+The interactive chat session SHALL interpret key events from the deployment-target keyboard controller path using US keyboard layout semantics.
 
 #### Scenario: Printable characters appear on the current line
 
 - **GIVEN** the interactive chat session is waiting for user input
-- **WHEN** the operator presses keys that produce US-layout printable ASCII characters
+- **WHEN** the operator presses keys that produce US-layout printable ASCII characters on the integrated keyboard
 - **THEN** those characters are echoed to the console as part of the current input line
 - **AND** the characters are retained as the pending user message until submission or editing
 
 #### Scenario: Backspace edits the current line
 
 - **GIVEN** the operator has typed one or more characters on the current input line
-- **WHEN** the operator presses Backspace
+- **WHEN** the operator presses Backspace on the integrated keyboard
 - **THEN** the last character is removed from the pending line
 - **AND** console echo reflects the shortened line state
 
 #### Scenario: Enter submits the current line
 
 - **GIVEN** the operator has composed a non-empty input line
-- **WHEN** the operator presses Enter
+- **WHEN** the operator presses Enter on the integrated keyboard
 - **THEN** the pending line is submitted to the chat session as a user message
 - **AND** a new empty input line begins for the next turn
 
@@ -50,7 +61,7 @@ The interactive chat session SHALL end only when the operator issues an explicit
 #### Scenario: Exit command ends session
 
 - **GIVEN** the session is waiting for user input
-- **WHEN** the operator submits a recognized exit command
+- **WHEN** the operator submits a recognized exit command via the integrated keyboard
 - **THEN** no further inference requests are sent for that session
 - **AND** the image proceeds to orderly shutdown after network diagnostics and chat work complete
 
