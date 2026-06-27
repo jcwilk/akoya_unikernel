@@ -11,6 +11,3 @@ test: build
 
 run: build
 	@bash scripts/run-qemu.sh --headful
-
-run-vnc: build
-	@bash scripts/run-qemu.sh --headful --vnc

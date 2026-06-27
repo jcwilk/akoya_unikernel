@@ -19,8 +19,6 @@ MEM_LIMIT_MB="${AKOYA_BUILD_MEM_LIMIT_MB:-4096}"
 MEM_LIMIT_KB=$((MEM_LIMIT_MB * 1024))
 MEM_LIMIT_BYTES=$((MEM_LIMIT_MB * 1024 * 1024))
 
-DOCKER_IMAGE="${AKOYA_BUILD_DOCKER_IMAGE:-qsrahmans/i686-elf-gcc:dev}"
-
 log() {
     printf '%s\n' "$*" | tee -a "${LOG_FILE}"
 }
@@ -61,36 +59,13 @@ run_with_memory_limit() {
     fi
 }
 
-run_build_in_docker() {
-    docker run --rm \
-        -v "${ROOT_DIR}:/work" \
-        -w /work \
-        -e AKOYA_CROSS_PREFIX="${CC_PREFIX}" \
-        -e AKOYA_BUILD_MEM_LIMIT_MB="${MEM_LIMIT_MB}" \
-        -e AKOYA_BUILD_USE_DOCKER=0 \
-        "${DOCKER_IMAGE}" \
-        bash scripts/build.sh
-}
-
 main() {
     mkdir -p "${BUILD_DIR}"
     : > "${LOG_FILE}"
 
-    if [[ "${AKOYA_BUILD_USE_DOCKER:-1}" == "1" ]] && ! toolchain_available; then
-        log "Local ${CC} not found; using Docker image ${DOCKER_IMAGE}"
-        if ! command -v docker >/dev/null 2>&1; then
-            log "ERROR: cross compiler missing and docker unavailable"
-            log "Install i686-elf-gcc/binutils or qemu-system-i386 prerequisites documented in README.md"
-            emit_result "failure" "missing-toolchain"
-            exit 1
-        fi
-        run_build_in_docker
-        exit $?
-    fi
-
     if ! toolchain_available; then
         log "ERROR: required cross toolchain not found (${CC}, ${LD})"
-        log "Install i686-elf-gcc and i686-elf-binutils, or set AKOYA_CROSS_PREFIX"
+        log "Install i686-elf-gcc and i686-elf-binutils, set AKOYA_CROSS_PREFIX, or use tools/bin in this repo"
         emit_result "failure" "missing-toolchain"
         exit 1
     fi

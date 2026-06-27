@@ -15,20 +15,15 @@ Machine-readable constants live in `target/akoya.profile`.
 
 ## Prerequisites
 
-Development workstation (Linux assumed for v1 scripts):
+Development workstation (Linux):
 
-- **Cross toolchain:** `i686-elf-gcc` and `i686-elf-binutils` (or set `AKOYA_CROSS_PREFIX` for an equivalent prefix). On Debian/Ubuntu:
+- **Cross toolchain:** `i686-elf-gcc` and `i686-elf-binutils` on `PATH`, or the vendored toolchain under `tools/bin/` (prepended automatically by `scripts/build.sh`). To install system-wide, see [OSDev GCC Cross-Compiler](https://wiki.osdev.org/GCC_Cross-Compiler).
+
+- **QEMU:** `qemu-system-i386` for emulation (Debian/Ubuntu package `qemu-system-x86`):
 
   ```bash
-  sudo apt install gcc-i686-linux-gnu binutils-i686-linux-gnu
-  export AKOYA_CROSS_PREFIX=i686-linux-gnu-
+  sudo apt install qemu-system-x86
   ```
-
-  For freestanding bare-metal builds, an `i686-elf-*` toolchain is preferred (see [OSDev GCC Cross-Compiler](https://wiki.osdev.org/GCC_Cross-Compiler)).
-
-- **QEMU:** `qemu-system-i386` for smoke tests (`qemu-system-x86` package on Debian/Ubuntu).
-
-- **Optional:** Docker — when the cross compiler or QEMU is not installed locally, `scripts/build.sh` and `scripts/run-qemu.sh` can fall back to documented container images (`AKOYA_BUILD_DOCKER_IMAGE`, `AKOYA_QEMU_DOCKER_IMAGE`).
 
 - **Node.js 20.19+** for OpenSpec Flow (`npx @fission-ai/openspec@latest …`).
 
@@ -49,12 +44,11 @@ The canonical way to run a built boot image under emulation. **Display mode is m
 # Headless smoke test (timeout + bootstrap message assertion)
 bash scripts/run-qemu.sh --headless
 
-# Interactive display window
+# Interactive display window (stays open after guest halts so you can read VGA output)
 bash scripts/run-qemu.sh --headful
 
-# Headful via VNC (useful in Docker or on remote workstations without native X11)
-bash scripts/run-qemu.sh --headful --vnc
-# Connect with a VNC client to vnc://127.0.0.1:5900
+# Headful but exit as soon as the guest finishes (quick flash)
+bash scripts/run-qemu.sh --headful --exit-on-guest-done
 
 # Run a specific image
 bash scripts/run-qemu.sh --headless --image build/kernel.elf
@@ -68,7 +62,9 @@ bash scripts/run-qemu.sh --headless --image build/kernel.elf
 | No `*.elf` or `*.bin` | Fails: no runnable image; run `make build` |
 | `v1` + `v2` stems (e.g. `v1.elf`, `v2.elf`) | Fails: lists ambiguous logical identities; pass `--image` |
 
-`make test` invokes `--headless`; `make run` invokes `--headful`.
+`make test` invokes `--headless` (exits when the guest finishes). `make run` invokes `--headful` (holds the window open after the guest halts).
+
+**Guest shutdown behavior:** By default, headless runs attach QEMU's debug-exit device so the emulator closes when the bootstrap kernel finishes — ideal for `make test`. Headful runs omit that device so the guest halts in place and the window stays open until you close it. Override with `--exit-on-guest-done` or `--hold` on either mode.
 
 ### Build environment variables
 
@@ -76,7 +72,6 @@ bash scripts/run-qemu.sh --headless --image build/kernel.elf
 |----------|---------|---------|
 | `AKOYA_BUILD_MEM_LIMIT_MB` | `4096` | Virtual-memory ceiling for compilation |
 | `AKOYA_CROSS_PREFIX` | `i686-elf-` | Toolchain command prefix |
-| `AKOYA_BUILD_USE_DOCKER` | `1` | Use Docker when local cross GCC is missing |
 
 Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `build/build.log`.
 
@@ -84,7 +79,7 @@ Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `buil
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `AKOYA_QEMU_TIMEOUT_SEC` | `30` | Max seconds before smoke test fails |
+| `AKOYA_QEMU_TIMEOUT_SEC` | `30` | Max seconds before smoke test fails (headless, exit-on-guest-done) |
 | `AKOYA_BOOTSTRAP_MESSAGE` | `akoya_unikernel bootstrap ok` | Expected console output |
 
 ## Bare-metal boot (manual)

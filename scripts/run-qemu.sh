@@ -7,26 +7,29 @@ LOG_FILE="${BUILD_DIR}/qemu-smoke.log"
 
 QEMU_BIN="${AKOYA_QEMU_BIN:-qemu-system-i386}"
 TIMEOUT_SEC="${AKOYA_QEMU_TIMEOUT_SEC:-30}"
-DOCKER_TIMEOUT_SEC="${AKOYA_QEMU_DOCKER_TIMEOUT_SEC:-180}"
 BOOT_MESSAGE="${AKOYA_BOOTSTRAP_MESSAGE:-akoya_unikernel bootstrap ok}"
-DOCKER_IMAGE="${AKOYA_QEMU_DOCKER_IMAGE:-ubuntu:24.04}"
 
 MODE=""
-HEADFUL_VNC=0
 IMAGE_PATH=""
+# Empty = use mode default; 1 = exit when guest triggers shutdown; 0 = hold QEMU open after guest halts
+EXIT_ON_GUEST_DONE=""
 
 usage() {
     cat >&2 <<EOF
-Usage: $0 (--headful|--headless) [--image PATH] [--vnc]
+Usage: $0 (--headful|--headless) [--image PATH] [--exit-on-guest-done | --hold]
 
-  --headful     Interactive display (SDL/GTK window, or --vnc for remote viewer)
+  --headful     Interactive SDL display window
   --headless    No display; smoke-test timeout and bootstrap message assertion
   --image PATH  Boot image to run (default: auto-select when exactly one logical image exists)
-  --vnc         Headful via VNC on localhost:5900 (useful with Docker / headless workstations)
+
+  --exit-on-guest-done  QEMU exits when the guest finishes (default for --headless)
+  --hold                Keep QEMU open after the guest halts; close the window or Ctrl+C (default for --headful)
 
 Display mode is mandatory: specify exactly one of --headful or --headless.
 When --image is omitted, runnable images (*.elf, *.bin) in the build output directory
 are grouped by stem (e.g. kernel.elf + kernel.bin count as one logical "kernel" image).
+
+Requires: qemu-system-i386 (qemu-system-x86 package on Debian/Ubuntu).
 EOF
 }
 
@@ -55,8 +58,18 @@ while [[ $# -gt 0 ]]; do
             IMAGE_PATH="$2"
             shift 2
             ;;
-        --vnc)
-            HEADFUL_VNC=1
+        --exit-on-guest-done)
+            if [[ "${EXIT_ON_GUEST_DONE}" == "0" ]]; then
+                fail "specify only one of --exit-on-guest-done or --hold"
+            fi
+            EXIT_ON_GUEST_DONE=1
+            shift
+            ;;
+        --hold)
+            if [[ "${EXIT_ON_GUEST_DONE}" == "1" ]]; then
+                fail "specify only one of --exit-on-guest-done or --hold"
+            fi
+            EXIT_ON_GUEST_DONE=0
             shift
             ;;
         -h|--help)
@@ -73,8 +86,16 @@ if [[ -z "${MODE}" ]]; then
     fail "display mode is required: specify --headful or --headless"
 fi
 
-if [[ "${HEADFUL_VNC}" -eq 1 && "${MODE}" != "headful" ]]; then
-    fail "--vnc is only valid with --headful"
+if [[ -z "${EXIT_ON_GUEST_DONE}" ]]; then
+    if [[ "${MODE}" == "headless" ]]; then
+        EXIT_ON_GUEST_DONE=1
+    else
+        EXIT_ON_GUEST_DONE=0
+    fi
+fi
+
+if ! command -v "${QEMU_BIN}" >/dev/null 2>&1; then
+    fail "${QEMU_BIN} not found; install qemu-system-x86 (e.g. sudo apt install qemu-system-x86)"
 fi
 
 # Collect stems of runnable images (*.elf, *.bin) directly under BUILD_DIR.
@@ -91,7 +112,6 @@ discover_logical_stems() {
     done
     shopt -u nullglob
 
-    # Deduplicate stems while preserving order.
     local unique=() seen
     for stem in "${stems[@]}"; do
         seen=0
@@ -148,10 +168,6 @@ resolve_kernel_image() {
     resolve_image_for_stem "${stems[0]}"
 }
 
-qemu_available() {
-    command -v "${QEMU_BIN}" >/dev/null 2>&1
-}
-
 main() {
     mkdir -p "${BUILD_DIR}"
 
@@ -163,16 +179,19 @@ main() {
     local display_args=(-display none)
     local run_timeout=("${TIMEOUT_SEC}")
     if [[ "${MODE}" == "headful" ]]; then
-        if [[ "${HEADFUL_VNC}" -eq 1 ]]; then
-            display_args=(-display "vnc=127.0.0.1:0")
-            echo "Running QEMU headfully with VNC at vnc://127.0.0.1:5900 (close QEMU or Ctrl+C to exit)" | tee -a "${LOG_FILE}"
+        display_args=(-display sdl)
+        if [[ "${EXIT_ON_GUEST_DONE}" -eq 0 ]]; then
+            echo "Running QEMU headfully (guest will halt; close the window or Ctrl+C when done)" | tee -a "${LOG_FILE}"
         else
-            display_args=(-display sdl)
-            echo "Running QEMU headfully (close the window to exit)" | tee -a "${LOG_FILE}"
+            echo "Running QEMU headfully" | tee -a "${LOG_FILE}"
         fi
         run_timeout=()
     else
-        echo "Running QEMU headless smoke test (timeout ${TIMEOUT_SEC}s)" | tee -a "${LOG_FILE}"
+        if [[ "${EXIT_ON_GUEST_DONE}" -eq 0 ]]; then
+            echo "Running QEMU headless with --hold (no auto-exit on guest shutdown)" | tee -a "${LOG_FILE}"
+        else
+            echo "Running QEMU headless smoke test (timeout ${TIMEOUT_SEC}s)" | tee -a "${LOG_FILE}"
+        fi
     fi
 
     echo "Boot image: ${kernel_image}" | tee -a "${LOG_FILE}"
@@ -184,47 +203,17 @@ main() {
         "${display_args[@]}"
         -serial stdio
         -no-reboot
-        -device isa-debug-exit,iobase=0xf4,iosize=0x04
-        -kernel "${kernel_image}"
     )
-
-    local kernel_relpath="${kernel_image#${ROOT_DIR}/}"
-    local -a docker_display=()
-    if [[ "${MODE}" == "headful" && -n "${DISPLAY:-}" ]]; then
-        docker_display=(-e "DISPLAY=${DISPLAY}" -v /tmp/.X11-unix:/tmp/.X11-unix)
+    if [[ "${EXIT_ON_GUEST_DONE}" -eq 1 ]]; then
+        qemu_args+=(-device isa-debug-exit,iobase=0xf4,iosize=0x04)
     fi
-    local -a docker_publish=()
-    if [[ "${HEADFUL_VNC}" -eq 1 ]]; then
-        docker_publish=(-p 5900:5900)
-    fi
-    local -a docker_cmd=(
-        docker run --rm -i
-        "${docker_display[@]}"
-        "${docker_publish[@]}"
-        -e QEMU_X11_NO_MITSHM=1
-        -e SDL_VIDEODRIVER=x11
-        -v "${ROOT_DIR}:/work"
-        -w /work
-        "${DOCKER_IMAGE}"
-        bash -lc "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq qemu-system-x86 libsdl2-2.0-0 >/dev/null && qemu-system-i386 -m 512 -cpu pentium3 -smp 1 ${display_args[*]} -serial stdio -no-reboot -device isa-debug-exit,iobase=0xf4,iosize=0x04 -kernel /work/${kernel_relpath}"
-    )
+    qemu_args+=(-kernel "${kernel_image}")
 
     set +e
-    if qemu_available; then
-        if [[ ${#run_timeout[@]} -gt 0 ]]; then
-            timeout "${run_timeout[@]}" "${QEMU_BIN}" "${qemu_args[@]}" 2>&1 | tee -a "${LOG_FILE}"
-        else
-            "${QEMU_BIN}" "${qemu_args[@]}" 2>&1 | tee -a "${LOG_FILE}"
-        fi
-    elif command -v docker >/dev/null 2>&1; then
-        echo "Native ${QEMU_BIN} not found; using Docker image ${DOCKER_IMAGE}" | tee -a "${LOG_FILE}"
-        if [[ ${#run_timeout[@]} -gt 0 ]]; then
-            timeout "${DOCKER_TIMEOUT_SEC}" "${docker_cmd[@]}" 2>&1 | tee -a "${LOG_FILE}"
-        else
-            "${docker_cmd[@]}" 2>&1 | tee -a "${LOG_FILE}"
-        fi
+    if [[ ${#run_timeout[@]} -gt 0 ]]; then
+        timeout "${run_timeout[@]}" "${QEMU_BIN}" "${qemu_args[@]}" 2>&1 | tee -a "${LOG_FILE}"
     else
-        fail "qemu-system-i386 not found and docker unavailable"
+        "${QEMU_BIN}" "${qemu_args[@]}" 2>&1 | tee -a "${LOG_FILE}"
     fi
     local qemu_status=${PIPESTATUS[0]}
     set -e
