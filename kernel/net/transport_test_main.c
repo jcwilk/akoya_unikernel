@@ -109,9 +109,8 @@ static int tcp_connect_and_close(ipv4_addr_t dest, uint16_t port, uint32_t timeo
         return 0;
     }
     tcp_session_close(&session);
-    for (int i = 0; i < 200 && !tcp_transport_inactive(); i++) {
-        link_poll();
-        time_delay_ms(10U);
+    if (!tcp_drain_until_inactive(TCP_CLOSE_DRAIN_MS)) {
+        return 0;
     }
     return 1;
 }

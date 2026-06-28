@@ -5,6 +5,8 @@
 
 #include "net/nettypes.h"
 
+#define TCP_CLOSE_DRAIN_MS 5000U
+
 typedef enum {
     TCP_OK = 0,
     TCP_FAIL_CONNECT,
@@ -39,5 +41,9 @@ tcp_status_t tcp_session_recv_until(
 void tcp_session_close(tcp_session_t *session);
 
 int tcp_transport_inactive(void);
+
+void tcp_transport_release(void);
+
+int tcp_drain_until_inactive(uint32_t timeout_ms);
 
 #endif

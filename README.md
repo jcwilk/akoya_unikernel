@@ -49,8 +49,10 @@ Automated verification **requires** the configured inference endpoint (`AKOYA_CH
 |-------------|---------|
 | `bash scripts/run-transport-test.sh` | Build (if needed), run `transport-test` image headlessly, exit 0 on `transport-test: ALL PASS` |
 | `bash scripts/run-qemu.sh --headless --logical kernel --script FILE` | Full-app scripted chat with output assertions (`*.akoya-script`) |
-| `bash scripts/run-qemu.sh --headless --logical kernel` | Default multi-turn smoke (unchanged `AKOYA_CHAT_SCRIPT` path) |
+| `bash scripts/run-qemu.sh --headless --logical kernel` | Default multi-turn scripted chat regression (`scripts/fixtures/multi-turn-pong.akoya-script`) |
 | `bash scripts/run-qemu.sh --headless --image build/transport-test.elf` | Explicit transport-test image selection when both images exist |
+
+Passing `bash scripts/run-transport-test.sh` alone does **not** satisfy the default multi-turn chat health gate; run `make test` or headless kernel scripted chat for that requirement.
 
 When both `kernel.*` and `transport-test.*` exist under `build/`, omit `--image` / `--logical` and the runner errors with an actionable list—use `--logical kernel` or `--logical transport-test`.
 
@@ -110,14 +112,15 @@ After network diagnostics succeed, the kernel enters a REPL-style chat loop:
 - **Line editing:** Printable ASCII is echoed; Backspace removes the last character; Enter submits the line. Empty lines are ignored.
 - **Exit:** Type `quit` or `exit` (case-insensitive) to end the session without sending inference.
 - **History:** Up to 16 turns (~8 KB JSON budget) of user and assistant messages are retained in memory and included in each chat-completion request.
-- **Headless automation:** `make test` injects a default keyboard script (`hi` + Enter + `quit` + Enter) via the QEMU monitor. Override with `AKOYA_CHAT_SCRIPT` (space-separated QEMU `sendkey` names, e.g. `h i ret q u i t ret`).
+- **Headless automation:** `make test` runs the default multi-turn scripted regression (`scripts/fixtures/multi-turn-pong.akoya-script`): two inference turns with per-turn reply assertions and rejection of connection-failure lines between turns. Set `AKOYA_USE_KEYBOARD_SCRIPT=1` to restore legacy QEMU `sendkey` injection via `AKOYA_CHAT_SCRIPT` instead.
 
 Headless `make test` asserts:
 
 - Bootstrap message (`akoya_unikernel bootstrap ok`)
 - `net_ip=<dotted-quad>` with a leased IPv4 address
 - `net_ping=<label> status=ok rtt_ms=<n>` (ICMP to the build-time probe target must succeed)
-- `chat_completion=ok reply=<text>` with a non-empty reply when the host can reach `192.168.1.110:11435` at test time (pre-flight check in `run-qemu.sh`)
+- Plain assistant reply text for at least two scripted chat turns when the host can reach `192.168.1.110:11435` at test time (pre-flight check in `run-qemu.sh`)
+- No `chat failed:` lines between successful multi-turn exchanges
 
 **llama.cpp prerequisite:** For full chat-completion acceptance, run a llama.cpp OpenAI-compatible server on the workstation LAN at `http://192.168.1.110:11435/v1/chat/completions`. Headless verification aborts before emulation when the endpoint is unreachable from the workstation.
 
@@ -198,7 +201,8 @@ Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `buil
 | `AKOYA_LAN_LIBEXEC` | `/usr/local/libexec/akoya` | Installed helper scripts for passwordless sudo |
 | `AKOYA_CHAT_HOST_IP` | `192.168.1.110` | Chat endpoint host for pre-flight reachability check |
 | `AKOYA_CHAT_PORT` | `11435` | Chat endpoint port for pre-flight reachability check |
-| `AKOYA_CHAT_SCRIPT` | `h i ret q u i t ret` | Headless QEMU monitor sendkey sequence for automated chat input |
+| `AKOYA_CHAT_SCRIPT` | `h i ret w h a t ret q u i t ret` | Legacy headless sendkey sequence when `AKOYA_USE_KEYBOARD_SCRIPT=1` |
+| `AKOYA_USE_KEYBOARD_SCRIPT` | `0` | `1` selects `AKOYA_CHAT_SCRIPT` instead of the default multi-turn `*.akoya-script` |
 
 ## Bare-metal boot (manual)
 

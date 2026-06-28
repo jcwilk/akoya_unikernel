@@ -5,9 +5,7 @@
 expect " reachable"
 
 type "reply only with the word PONG"
-expect "PONG"
-
-delay 1000
+expect_line reply
 
 type "second message"
 expect_line reply

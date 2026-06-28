@@ -12,7 +12,6 @@
 #define TCP_FLAG_PSH 0x08U
 #define TCP_FLAG_ACK 0x10U
 
-#define TCP_CLOSE_DRAIN_MS 2000U
 #define TCP_POST_BODY_DRAIN_MS 2000U
 
 struct tcp_header {
@@ -318,7 +317,29 @@ int tcp_transport_inactive(void)
         && recv_buf == 0
         && recv_len == 0
         && conn_local_port == 0
-        && conn_remote_port == 0;
+        && conn_remote_port == 0
+        && ipv4_is_zero(conn_remote_ip);
+}
+
+void tcp_transport_release(void)
+{
+    tcp_unregister_handler();
+    link_drain_rx(0);
+    tcp_reset_flow_state();
+}
+
+int tcp_drain_until_inactive(uint32_t timeout_ms)
+{
+    uint32_t deadline = time_millis() + timeout_ms;
+
+    while (time_millis() < deadline) {
+        if (tcp_transport_inactive()) {
+            return 1;
+        }
+        link_poll();
+    }
+
+    return tcp_transport_inactive();
 }
 
 static void tcp_begin_recv(uint8_t *buf, uint16_t cap, uint16_t *len_out)
@@ -487,26 +508,29 @@ tcp_status_t tcp_session_recv_until(
 
 void tcp_session_close(tcp_session_t *session)
 {
-    if (session == 0) {
+    if (session != 0 && session->open) {
         tcp_quiesce_connection(TCP_CLOSE_DRAIN_MS);
-        tcp_unregister_handler();
-        link_drain_rx(0);
-        tcp_reset_flow_state();
-        return;
+
+        uint32_t deadline = time_millis() + TCP_CLOSE_DRAIN_MS;
+        while (time_millis() < deadline) {
+            link_poll();
+            if (conn_reset || (conn_our_fin_sent && conn_remote_fin)) {
+                break;
+            }
+        }
+
+        if (conn_established && !conn_reset && !(conn_our_fin_sent && conn_remote_fin)) {
+            (void)tcp_send_segment(TCP_FLAG_RST | TCP_FLAG_ACK, 0, 0);
+            conn_reset = 1;
+            link_drain_rx(0);
+        }
+    } else if (session == 0) {
+        tcp_quiesce_connection(TCP_CLOSE_DRAIN_MS);
     }
 
-    if (!session->open) {
-        tcp_unregister_handler();
-        link_drain_rx(0);
-        tcp_reset_flow_state();
+    tcp_transport_release();
+
+    if (session != 0) {
         session->open = 0;
-        return;
     }
-
-    tcp_quiesce_connection(TCP_CLOSE_DRAIN_MS);
-
-    tcp_unregister_handler();
-    link_drain_rx(0);
-    tcp_reset_flow_state();
-    session->open = 0;
 }

@@ -1,7 +1,6 @@
 #include "input/ps2_readline.h"
 
 #include "input/ps2_keyboard.h"
-#include "net/link/link.h"
 
 int ps2_read_line(char *buf, int cap)
 {
@@ -13,8 +12,6 @@ int ps2_read_line(char *buf, int cap)
     buf[0] = '\0';
 
     for (;;) {
-        link_poll();
-
         unsigned char scan = 0;
         if (ps2_poll_scancode(&scan) != 0) {
             continue;

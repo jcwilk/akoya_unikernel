@@ -687,8 +687,11 @@ static http_chat_status_t http_chat_turn_exchange(
 
 static http_chat_status_t http_chat_run_turn(chat_history_t *history, char *reply, int reply_cap)
 {
-    if (!tcp_transport_inactive()) {
-        return HTTP_CHAT_FAIL_CONNECT;
+    if (!tcp_drain_until_inactive(TCP_CLOSE_DRAIN_MS)) {
+        tcp_transport_release();
+        if (!tcp_drain_until_inactive(TCP_CLOSE_DRAIN_MS)) {
+            return HTTP_CHAT_FAIL_CONNECT;
+        }
     }
 
     ipv4_addr_t host;
@@ -718,8 +721,11 @@ static http_chat_status_t http_chat_run_turn(chat_history_t *history, char *repl
 
     tcp_session_close(&session);
 
-    if (!tcp_transport_inactive()) {
-        return HTTP_CHAT_FAIL_CONNECT;
+    if (!tcp_drain_until_inactive(TCP_CLOSE_DRAIN_MS)) {
+        tcp_transport_release();
+        if (!tcp_drain_until_inactive(TCP_CLOSE_DRAIN_MS)) {
+            return HTTP_CHAT_FAIL_CONNECT;
+        }
     }
 
     return status;
