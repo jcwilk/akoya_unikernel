@@ -34,6 +34,10 @@
 #define AKOYA_CHAT_PORT 11435
 #endif
 
+#ifndef AKOYA_CHAT_MAX_TOKENS
+#define AKOYA_CHAT_MAX_TOKENS 500
+#endif
+
 #define HTTP_CHAT_RECV_CAP 4096U
 #define HTTP_CHAT_REPLY_CONSOLE_MAX 256U
 #define CHAT_MSG_MAX_LEN 128U
@@ -319,7 +323,7 @@ static int json_append_escaped(char *buf, int cap, int *pos, const char *text)
 
 static int estimate_json_size(const chat_history_t *history)
 {
-    int size = 32 + str_len(AKOYA_CHAT_MODEL);
+    int size = 32 + str_len(AKOYA_CHAT_MODEL) + 24;
     for (int t = 0; t < history->count; t++) {
         size += 32 + str_len(history->turns[t].user);
         if (history->turns[t].has_assistant) {
@@ -415,6 +419,39 @@ static int build_messages_json(const chat_history_t *history, char *json, int ca
         return -1;
     }
     json[pos++] = ']';
+
+    const char *max_prefix = ",\"max_tokens\":";
+    for (const char *p = max_prefix; *p != '\0'; p++) {
+        if (pos + 1 >= cap) {
+            return -1;
+        }
+        json[pos++] = *p;
+    }
+
+    unsigned int max_tokens = (unsigned int)AKOYA_CHAT_MAX_TOKENS;
+    if (max_tokens == 0U) {
+        if (pos + 1 >= cap) {
+            return -1;
+        }
+        json[pos++] = '0';
+    } else {
+        char tmp[12];
+        int tmp_idx = 0;
+        while (max_tokens > 0U && tmp_idx < (int)sizeof(tmp)) {
+            tmp[tmp_idx++] = (char)('0' + (max_tokens % 10U));
+            max_tokens /= 10U;
+        }
+        while (tmp_idx > 0) {
+            if (pos + 1 >= cap) {
+                return -1;
+            }
+            json[pos++] = tmp[--tmp_idx];
+        }
+    }
+
+    if (pos + 1 >= cap) {
+        return -1;
+    }
     json[pos++] = '}';
     json[pos] = '\0';
     return pos;

@@ -33,6 +33,7 @@ CHAT_USER_MSG="${AKOYA_CHAT_USER_MSG:-hi}"
 CHAT_MODEL="${AKOYA_CHAT_MODEL:-fast-text-qwen3-8b}"
 CHAT_TIMEOUT_MS="${AKOYA_CHAT_TIMEOUT_MS:-60000}"
 CHAT_PORT="${AKOYA_CHAT_PORT:-11435}"
+CHAT_MAX_TOKENS="${AKOYA_CHAT_MAX_TOKENS:-500}"
 
 log() {
     printf '%s\n' "$*" | tee -a "${LOG_FILE}"
@@ -183,6 +184,7 @@ main() {
         -DAKOYA_CHAT_MODEL=\"${CHAT_MODEL}\"
         -DAKOYA_CHAT_TIMEOUT_MS="${CHAT_TIMEOUT_MS}"
         -DAKOYA_CHAT_PORT="${CHAT_PORT}"
+        -DAKOYA_CHAT_MAX_TOKENS="${CHAT_MAX_TOKENS}"
     )
 
     local shared_sources=(
