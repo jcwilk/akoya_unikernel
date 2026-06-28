@@ -8,6 +8,7 @@ fi
 BUILD_DIR="${ROOT_DIR}/build"
 LOG_FILE="${BUILD_DIR}/build.log"
 KERNEL_BIN="${BUILD_DIR}/kernel.bin"
+TRANSPORT_BIN="${BUILD_DIR}/transport-test.bin"
 PROFILE_FILE="${ROOT_DIR}/target/akoya.profile"
 
 CC_PREFIX="${AKOYA_CROSS_PREFIX:-i686-elf-}"
@@ -40,8 +41,8 @@ log() {
 emit_result() {
     local status="$1"
     local message="$2"
-    printf 'AKOYA_BUILD_RESULT=status=%s;kernel=%s;log=%s;message=%s\n' \
-        "${status}" "${KERNEL_BIN}" "${LOG_FILE}" "${message}"
+    printf 'AKOYA_BUILD_RESULT=status=%s;kernel=%s;transport=%s;log=%s;message=%s\n' \
+        "${status}" "${KERNEL_BIN}" "${TRANSPORT_BIN}" "${LOG_FILE}" "${message}"
 }
 
 resolve_build_id() {
@@ -101,6 +102,26 @@ compile_source() {
         emit_result "failure" "compile-error"
         exit 1
     fi
+}
+
+link_image() {
+    local elf_path="$1"
+    local bin_path="$2"
+    shift 2
+    local -a objects=("$@")
+
+    log "Linking ${elf_path}"
+    if ! run_with_memory_limit "${LD}" -m elf_i386 -T "${ROOT_DIR}/linker.ld" -o "${elf_path}" "${objects[@]}" 2>&1 | tee -a "${LOG_FILE}"; then
+        emit_result "failure" "link-error"
+        exit 1
+    fi
+
+    if ! run_with_memory_limit "${OBJCOPY}" -O binary "${elf_path}" "${bin_path}" 2>&1 | tee -a "${LOG_FILE}"; then
+        emit_result "failure" "objcopy-error"
+        exit 1
+    fi
+
+    log "Build succeeded: ${bin_path}"
 }
 
 main() {
@@ -164,11 +185,9 @@ main() {
         -DAKOYA_CHAT_PORT="${CHAT_PORT}"
     )
 
-    local sources=(
+    local shared_sources=(
         "${ROOT_DIR}/kernel/boot/entry.S"
         "${ROOT_DIR}/kernel/console/console.c"
-        "${ROOT_DIR}/kernel/input/ps2_keyboard.c"
-        "${ROOT_DIR}/kernel/input/ps2_readline.c"
         "${ROOT_DIR}/kernel/pci/pci.c"
         "${ROOT_DIR}/kernel/time/time.c"
         "${ROOT_DIR}/kernel/net/eth/eth.c"
@@ -178,35 +197,57 @@ main() {
         "${ROOT_DIR}/kernel/net/dhcp/dhcp.c"
         "${ROOT_DIR}/kernel/net/icmp/icmp.c"
         "${ROOT_DIR}/kernel/net/tcp/tcp.c"
+    )
+
+    local kernel_only_sources=(
+        "${ROOT_DIR}/kernel/input/ps2_keyboard.c"
+        "${ROOT_DIR}/kernel/input/ps2_readline.c"
         "${ROOT_DIR}/kernel/net/http/http_chat.c"
         "${ROOT_DIR}/kernel/net/netmain.c"
         "${ROOT_DIR}/kernel/main.c"
     )
 
-    local objects=()
+    local transport_only_sources=(
+        "${ROOT_DIR}/kernel/net/transport_test_main.c"
+        "${ROOT_DIR}/kernel/transport_main.c"
+    )
+
+    local shared_objects=()
+    local kernel_objects=()
+    local transport_objects=()
     local source object base
 
     log "Compiling with ${CC} (memory limit ${MEM_LIMIT_MB} MB)"
-    for source in "${sources[@]}"; do
+    for source in "${shared_sources[@]}"; do
         base="$(basename "${source}")"
         base="${base%.*}"
-        object="${BUILD_DIR}/${base}.o"
-        objects+=("${object}")
+        object="${BUILD_DIR}/shared-${base}.o"
+        shared_objects+=("${object}")
         compile_source "${source}" "${object}"
     done
 
-    log "Linking ${KERNEL_BIN}"
-    if ! run_with_memory_limit "${LD}" -m elf_i386 -T "${ROOT_DIR}/linker.ld" -o "${BUILD_DIR}/kernel.elf" "${objects[@]}" 2>&1 | tee -a "${LOG_FILE}"; then
-        emit_result "failure" "link-error"
-        exit 1
-    fi
+    for source in "${kernel_only_sources[@]}"; do
+        base="$(basename "${source}")"
+        base="${base%.*}"
+        object="${BUILD_DIR}/kernel-${base}.o"
+        kernel_objects+=("${object}")
+        compile_source "${source}" "${object}"
+    done
 
-    if ! run_with_memory_limit "${OBJCOPY}" -O binary "${BUILD_DIR}/kernel.elf" "${KERNEL_BIN}" 2>&1 | tee -a "${LOG_FILE}"; then
-        emit_result "failure" "objcopy-error"
-        exit 1
-    fi
+    for source in "${transport_only_sources[@]}"; do
+        base="$(basename "${source}")"
+        base="${base%.*}"
+        object="${BUILD_DIR}/transport-${base}.o"
+        transport_objects+=("${object}")
+        compile_source "${source}" "${object}"
+    done
 
-    log "Build succeeded: ${KERNEL_BIN}"
+    link_image "${BUILD_DIR}/kernel.elf" "${KERNEL_BIN}" \
+        "${shared_objects[@]}" "${kernel_objects[@]}"
+
+    link_image "${BUILD_DIR}/transport-test.elf" "${TRANSPORT_BIN}" \
+        "${shared_objects[@]}" "${transport_objects[@]}"
+
     emit_result "success" "build-complete"
 }
 

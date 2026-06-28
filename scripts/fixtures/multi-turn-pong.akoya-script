@@ -1,0 +1,17 @@
+# Multi-turn chat script fixture for agent regression.
+# Requires inference endpoint reachable from workstation (pre-flight in run-qemu.sh).
+
+# Wait for network reachability line before chat steps.
+expect " reachable"
+
+type "reply only with the word PONG"
+expect "PONG"
+
+delay 1000
+
+type "second message"
+expect_line reply
+
+expect_not "chat failed: connect"
+
+type "quit"

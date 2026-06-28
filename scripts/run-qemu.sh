@@ -20,18 +20,28 @@ STATE_FILE="${AKOYA_QEMU_STATE_FILE:-/tmp/akoya-qemu-bridge.state}"
 AUTO_LAN="${AKOYA_AUTO_LAN:-${AKOYA_AUTO_BRIDGE:-1}}"
 LAN_LIBEXEC="${AKOYA_LAN_LIBEXEC:-${AKOYA_BRIDGE_LIBEXEC:-/usr/local/libexec/akoya}}"
 
+# shellcheck source=scripts/inference-preflight.sh
+source "${ROOT_DIR}/scripts/inference-preflight.sh"
+# shellcheck source=scripts/chat-script-harness.sh
+source "${ROOT_DIR}/scripts/chat-script-harness.sh"
+
 MODE=""
 IMAGE_PATH=""
+LOGICAL_ID=""
+SCRIPT_FILE=""
+SCRIPT_INJECT_STATUS=0
 # Empty = use mode default; 1 = exit when guest triggers shutdown; 0 = hold QEMU open after guest halts
 EXIT_ON_GUEST_DONE=""
 
 usage() {
     cat >&2 <<EOF
-Usage: $0 (--headful|--headless) [--image PATH] [--exit-on-guest-done | --hold]
+Usage: $0 (--headful|--headless) [--image PATH] [--logical NAME] [--script FILE] [--exit-on-guest-done | --hold]
 
   --headful     Interactive SDL display window
   --headless    No display; smoke-test timeout and bootstrap/network assertions
   --image PATH  Boot image to run (default: auto-select when exactly one logical image exists)
+  --logical NAME  Select logical image stem (e.g. kernel, transport-test)
+  --script FILE Headless scripted chat interaction with output assertions (*.akoya-script)
 
   --exit-on-guest-done  QEMU exits when the guest finishes (default for --headless)
   --hold                Keep QEMU open after the guest halts; close the window or Ctrl+C (default for --headful)
@@ -62,15 +72,7 @@ fail() {
 }
 
 chat_endpoint_reachable() {
-    if command -v nc >/dev/null 2>&1; then
-        nc -z -w 2 "${CHAT_HOST}" "${CHAT_PORT}" >/dev/null 2>&1
-        return $?
-    fi
-    if command -v timeout >/dev/null 2>&1 && command -v bash >/dev/null 2>&1; then
-        timeout 2 bash -c "echo >/dev/tcp/${CHAT_HOST}/${CHAT_PORT}" >/dev/null 2>&1
-        return $?
-    fi
-    return 1
+    inference_endpoint_reachable "${CHAT_HOST}" "${CHAT_PORT}"
 }
 
 send_monitor_command() {
@@ -163,6 +165,32 @@ inject_chat_script() {
             sleep 0.05
         fi
     done
+    return 0
+}
+
+inject_akoya_script() {
+    local waited=0
+    local status=0
+
+    while [[ ! -S "${MONITOR_SOCK}" && ${waited} -lt 240 ]]; do
+        sleep 0.25
+        waited=$((waited + 1))
+    done
+    if [[ ! -S "${MONITOR_SOCK}" ]]; then
+        echo "run-qemu.sh: monitor socket not ready for scripted keyboard injection" >&2
+        return 1
+    fi
+
+    if ! chat_script_wait_for_reachability "${LOG_FILE}"; then
+        send_monitor_command "quit" || true
+        return 1
+    fi
+
+    if ! chat_script_execute_interactive_steps "${LOG_FILE}" send_monitor_command; then
+        send_monitor_command "quit" || true
+        return 1
+    fi
+
     return 0
 }
 
@@ -308,6 +336,14 @@ while [[ $# -gt 0 ]]; do
             IMAGE_PATH="$2"
             shift 2
             ;;
+        --logical)
+            LOGICAL_ID="$2"
+            shift 2
+            ;;
+        --script)
+            SCRIPT_FILE="$2"
+            shift 2
+            ;;
         --exit-on-guest-done)
             if [[ "${EXIT_ON_GUEST_DONE}" == "0" ]]; then
                 fail "specify only one of --exit-on-guest-done or --hold"
@@ -336,6 +372,20 @@ if [[ -z "${MODE}" ]]; then
     fail "display mode is required: specify --headful or --headless"
 fi
 
+if [[ -n "${SCRIPT_FILE}" && "${MODE}" != "headless" ]]; then
+    fail "--script requires --headless (headful script injection is not supported)"
+fi
+
+if [[ -n "${SCRIPT_FILE}" && ! -f "${SCRIPT_FILE}" ]]; then
+    fail "script file not found: ${SCRIPT_FILE}"
+fi
+
+if [[ -n "${SCRIPT_FILE}" ]]; then
+    if ! chat_script_parse_file "${SCRIPT_FILE}"; then
+        fail "failed to parse script: ${SCRIPT_FILE}"
+    fi
+fi
+
 if [[ -z "${EXIT_ON_GUEST_DONE}" ]]; then
     if [[ "${MODE}" == "headless" ]]; then
         EXIT_ON_GUEST_DONE=1
@@ -346,6 +396,12 @@ fi
 
 if ! command -v "${QEMU_BIN}" >/dev/null 2>&1; then
     fail "${QEMU_BIN} not found; install qemu-system-x86 (e.g. sudo apt install qemu-system-x86)"
+fi
+
+if [[ "${MODE}" == "headless" ]]; then
+    if ! inference_preflight "run-qemu.sh"; then
+        exit 1
+    fi
 fi
 
 trap lan_down EXIT INT TERM
@@ -398,6 +454,15 @@ resolve_image_for_stem() {
 }
 
 resolve_kernel_image() {
+    if [[ -n "${IMAGE_PATH}" && -n "${LOGICAL_ID}" ]]; then
+        fail "specify only one of --image PATH or --logical NAME"
+    fi
+
+    if [[ -n "${LOGICAL_ID}" ]]; then
+        resolve_image_for_stem "${LOGICAL_ID}" || fail "logical image '${LOGICAL_ID}' not found in ${BUILD_DIR}"
+        return
+    fi
+
     if [[ -n "${IMAGE_PATH}" ]]; then
         if [[ ! -f "${IMAGE_PATH}" ]]; then
             fail "image not found: ${IMAGE_PATH}"
@@ -422,11 +487,20 @@ resolve_kernel_image() {
     resolve_image_for_stem "${stems[0]}"
 }
 
+image_is_transport_test() {
+    local image_path="$1"
+    [[ "$(basename "${image_path}")" == transport-test.bin || "$(basename "${image_path}")" == transport-test.elf ]]
+}
+
 main() {
     mkdir -p "${BUILD_DIR}"
 
     local kernel_image
     kernel_image="$(resolve_kernel_image)"
+    local transport_mode=0
+    if image_is_transport_test "${kernel_image}"; then
+        transport_mode=1
+    fi
 
     : > "${LOG_FILE}"
 
@@ -443,6 +517,8 @@ main() {
     else
         if [[ "${EXIT_ON_GUEST_DONE}" -eq 0 ]]; then
             echo "Running QEMU headless with --hold (no auto-exit on guest shutdown)" | tee -a "${LOG_FILE}"
+        elif [[ -n "${SCRIPT_FILE}" ]]; then
+            echo "Running QEMU headless scripted chat test (timeout ${TIMEOUT_SEC}s, script: ${SCRIPT_FILE})" | tee -a "${LOG_FILE}"
         else
             echo "Running QEMU headless smoke test (timeout ${TIMEOUT_SEC}s, keyboard script: ${CHAT_SCRIPT})" | tee -a "${LOG_FILE}"
         fi
@@ -480,11 +556,16 @@ main() {
     fi
 
     local inject_pid=""
-    if [[ "${MODE}" == "headless" ]]; then
+    if [[ "${MODE}" == "headless" && "${transport_mode}" -eq 0 ]]; then
         rm -f "${MONITOR_SOCK}"
         qemu_args+=(-monitor "unix:${MONITOR_SOCK},server,nowait")
-        inject_chat_script &
-        inject_pid=$!
+        if [[ -n "${SCRIPT_FILE}" ]]; then
+            inject_akoya_script &
+            inject_pid=$!
+        else
+            inject_chat_script &
+            inject_pid=$!
+        fi
     fi
 
     qemu_args+=(-kernel "${kernel_image}")
@@ -498,7 +579,11 @@ main() {
     local qemu_status=${PIPESTATUS[0]}
     exec 3>&- 2>/dev/null || true
     if [[ -n "${inject_pid}" ]]; then
-        wait "${inject_pid}" 2>/dev/null || true
+        local inject_status=0
+        wait "${inject_pid}" 2>/dev/null || inject_status=$?
+        if [[ ${inject_status} -ne 0 ]]; then
+            fail "headless keyboard/script injection failed (exit ${inject_status})"
+        fi
     fi
     set -e
 
@@ -519,6 +604,17 @@ main() {
         fail "expected bootstrap message not found in captured output"
     fi
 
+    if [[ "${transport_mode}" -eq 1 ]]; then
+        if grep -Fq "transport-test: ALL PASS" "${LOG_FILE}"; then
+            echo "QEMU transport-test passed" | tee -a "${LOG_FILE}"
+            exit 0
+        fi
+        if grep -Fq "transport-test: FAILED" "${LOG_FILE}"; then
+            fail "transport-test aggregate failure reported in captured output"
+        fi
+        fail "transport-test aggregate result not found in captured output"
+    fi
+
     if ! grep -Eq '^net_ip=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' "${LOG_FILE}"; then
         fail "expected net_ip= line not found in captured output"
     fi
@@ -531,23 +627,23 @@ main() {
         fail "old chat_completion= diagnostic framing detected in captured output"
     fi
 
-    local chat_assert=0
-    if chat_endpoint_reachable; then
-        chat_assert=1
-        echo "run-qemu.sh: chat endpoint ${CHAT_HOST}:${CHAT_PORT} reachable; asserting plain assistant replies" | tee -a "${LOG_FILE}"
-    else
-        echo "run-qemu.sh: WARNING: chat endpoint ${CHAT_HOST}:${CHAT_PORT} unreachable from host; skipping chat reply assertions" | tee -a "${LOG_FILE}"
+    if [[ -n "${SCRIPT_FILE}" ]]; then
+        if ! chat_script_run_assertions "${LOG_FILE}"; then
+            fail "scripted interaction assertions failed"
+        fi
+        echo "QEMU scripted chat test passed" | tee -a "${LOG_FILE}"
+        exit 0
     fi
 
-    if [[ "${chat_assert}" -eq 1 ]]; then
-        local reply_count
-        reply_count="$(count_plain_reply_lines)"
-        if [[ "${reply_count}" -lt 2 ]]; then
-            fail "expected at least 2 plain assistant reply lines (multi-turn), got ${reply_count}"
-        fi
-        if grep -q '^chat failed:' "${LOG_FILE}"; then
-            fail "chat failed detected during multi-turn session"
-        fi
+    echo "run-qemu.sh: chat endpoint ${CHAT_HOST}:${CHAT_PORT} reachable; asserting plain assistant replies" | tee -a "${LOG_FILE}"
+
+    local reply_count
+    reply_count="$(count_plain_reply_lines)"
+    if [[ "${reply_count}" -lt 2 ]]; then
+        fail "expected at least 2 plain assistant reply lines (multi-turn), got ${reply_count}"
+    fi
+    if grep -q '^chat failed:' "${LOG_FILE}"; then
+        fail "chat failed detected during multi-turn session"
     fi
 
     echo "QEMU smoke test passed" | tee -a "${LOG_FILE}"
