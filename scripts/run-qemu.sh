@@ -29,6 +29,8 @@ source "${ROOT_DIR}/scripts/chat-script-harness.sh"
 MODE=""
 IMAGE_PATH=""
 LOGICAL_ID=""
+BOOT_ISO_PATH=""
+ISO_SMOKE=0
 SCRIPT_FILE=""
 SCRIPT_INJECT_STATUS=0
 # Empty = use mode default; 1 = exit when guest triggers shutdown; 0 = hold QEMU open after guest halts
@@ -36,12 +38,13 @@ EXIT_ON_GUEST_DONE=""
 
 usage() {
     cat >&2 <<EOF
-Usage: $0 (--headful|--headless) [--image PATH] [--logical NAME] [--script FILE] [--exit-on-guest-done | --hold]
+Usage: $0 (--headful|--headless) [--image PATH | --logical NAME | --boot-iso PATH] [--script FILE] [--exit-on-guest-done | --hold]
 
   --headful     Interactive SDL display window
   --headless    No display; smoke-test timeout and bootstrap/network assertions
   --image PATH  Boot image to run (default: auto-select when exactly one logical image exists)
   --logical NAME  Select logical image stem (e.g. kernel, transport-test)
+  --boot-iso PATH  Boot from BIOS/Legacy optical media (mutually exclusive with --image / --logical)
   --script FILE Headless scripted chat interaction with output assertions (*.akoya-script)
 
   --exit-on-guest-done  QEMU exits when the guest finishes (default for --headless)
@@ -61,6 +64,10 @@ Environment:
   AKOYA_USE_KEYBOARD_SCRIPT 1 = use AKOYA_CHAT_SCRIPT instead of default multi-turn *.akoya-script
   AKOYA_AUTO_LAN          1 = macvtap up/down around each run (default: 1)
   AKOYA_LAN_LIBEXEC       Installed helper scripts for passwordless sudo (default: /usr/local/libexec/akoya)
+  AKOYA_SKIP_INFERENCE_PREFLIGHT  1 = skip chat-endpoint pre-flight (ISO smoke / verify-boot-iso)
+
+ISO boot (--boot-iso) uses BIOS/Legacy optical boot order and, in headless mode, a lighter
+assertion profile: bootstrap message plus connectivity-probe success only (no multi-turn chat).
 
 Install ${LAN_LIBEXEC}/qemu-bridge-{up,down}.sh with matching sudoers; see README.
 
@@ -342,6 +349,11 @@ while [[ $# -gt 0 ]]; do
             LOGICAL_ID="$2"
             shift 2
             ;;
+        --boot-iso)
+            BOOT_ISO_PATH="$2"
+            ISO_SMOKE=1
+            shift 2
+            ;;
         --script)
             SCRIPT_FILE="$2"
             shift 2
@@ -374,7 +386,17 @@ if [[ -z "${MODE}" ]]; then
     fail "display mode is required: specify --headful or --headless"
 fi
 
-if [[ -z "${SCRIPT_FILE}" && "${MODE}" == "headless" && "${AKOYA_USE_KEYBOARD_SCRIPT:-0}" != "1" ]]; then
+if [[ -n "${BOOT_ISO_PATH}" ]]; then
+    if [[ -n "${IMAGE_PATH}" || -n "${LOGICAL_ID}" ]]; then
+        fail "specify only one of --boot-iso PATH, --image PATH, or --logical NAME"
+    fi
+    if [[ ! -f "${BOOT_ISO_PATH}" ]]; then
+        fail "boot ISO not found: ${BOOT_ISO_PATH}"
+    fi
+    ISO_SMOKE=1
+fi
+
+if [[ -z "${SCRIPT_FILE}" && "${MODE}" == "headless" && "${ISO_SMOKE}" -eq 0 && "${AKOYA_USE_KEYBOARD_SCRIPT:-0}" != "1" ]]; then
     SCRIPT_FILE="${DEFAULT_CHAT_SCRIPT_FILE}"
 fi
 
@@ -404,7 +426,7 @@ if ! command -v "${QEMU_BIN}" >/dev/null 2>&1; then
     fail "${QEMU_BIN} not found; install qemu-system-x86 (e.g. sudo apt install qemu-system-x86)"
 fi
 
-if [[ "${MODE}" == "headless" ]]; then
+if [[ "${MODE}" == "headless" && "${AKOYA_SKIP_INFERENCE_PREFLIGHT:-0}" != "1" && "${ISO_SMOKE}" -eq 0 ]]; then
     if ! inference_preflight "run-qemu.sh"; then
         exit 1
     fi
@@ -501,11 +523,15 @@ image_is_transport_test() {
 main() {
     mkdir -p "${BUILD_DIR}"
 
-    local kernel_image
-    kernel_image="$(resolve_kernel_image)"
+    local kernel_image=""
     local transport_mode=0
-    if image_is_transport_test "${kernel_image}"; then
-        transport_mode=1
+    if [[ -n "${BOOT_ISO_PATH}" ]]; then
+        kernel_image="${BOOT_ISO_PATH}"
+    else
+        kernel_image="$(resolve_kernel_image)"
+        if image_is_transport_test "${kernel_image}"; then
+            transport_mode=1
+        fi
     fi
 
     : > "${LOG_FILE}"
@@ -523,6 +549,8 @@ main() {
     else
         if [[ "${EXIT_ON_GUEST_DONE}" -eq 0 ]]; then
             echo "Running QEMU headless with --hold (no auto-exit on guest shutdown)" | tee -a "${LOG_FILE}"
+        elif [[ "${ISO_SMOKE}" -eq 1 ]]; then
+            echo "Running QEMU headless ISO smoke test (timeout ${TIMEOUT_SEC}s, boot ISO: ${BOOT_ISO_PATH})" | tee -a "${LOG_FILE}"
         elif [[ -n "${SCRIPT_FILE}" ]]; then
             echo "Running QEMU headless scripted chat test (timeout ${TIMEOUT_SEC}s, script: ${SCRIPT_FILE})" | tee -a "${LOG_FILE}"
         else
@@ -530,7 +558,11 @@ main() {
         fi
     fi
 
-    echo "Boot image: ${kernel_image}" | tee -a "${LOG_FILE}"
+    if [[ "${ISO_SMOKE}" -eq 1 ]]; then
+        echo "Boot ISO: ${BOOT_ISO_PATH}" | tee -a "${LOG_FILE}"
+    else
+        echo "Boot image: ${kernel_image}" | tee -a "${LOG_FILE}"
+    fi
     echo "LAN: macvtap ${MACVTAP_IF} on ${LAN_IF}, guest MAC: ${GUEST_MAC}" | tee -a "${LOG_FILE}"
 
     # shellcheck disable=SC1090
@@ -562,7 +594,7 @@ main() {
     fi
 
     local inject_pid=""
-    if [[ "${MODE}" == "headless" && "${transport_mode}" -eq 0 ]]; then
+    if [[ "${MODE}" == "headless" && "${transport_mode}" -eq 0 && "${ISO_SMOKE}" -eq 0 ]]; then
         rm -f "${MONITOR_SOCK}"
         qemu_args+=(-monitor "unix:${MONITOR_SOCK},server,nowait")
         if [[ -n "${SCRIPT_FILE}" ]]; then
@@ -574,7 +606,11 @@ main() {
         fi
     fi
 
-    qemu_args+=(-kernel "${kernel_image}")
+    if [[ "${ISO_SMOKE}" -eq 1 ]]; then
+        qemu_args+=(-boot order=d -cdrom "${BOOT_ISO_PATH}")
+    else
+        qemu_args+=(-kernel "${kernel_image}")
+    fi
 
     set +e
     if [[ ${#run_timeout[@]} -gt 0 ]]; then
@@ -619,6 +655,29 @@ main() {
             fail "transport-test aggregate failure reported in captured output"
         fi
         fail "transport-test aggregate result not found in captured output"
+    fi
+
+    if [[ "${ISO_SMOKE}" -eq 1 ]]; then
+        if ! grep -Eq '^net_ip=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' "${LOG_FILE}"; then
+            fail "expected net_ip= line not found in captured output"
+        fi
+
+        if grep -Fq "${CHAT_HOST} reachable" "${LOG_FILE}"; then
+            echo "QEMU ISO smoke test passed (bootstrap + connectivity probe)" | tee -a "${LOG_FILE}"
+            exit 0
+        fi
+
+        if grep -Eq 'net_ping=.*status=ok' "${LOG_FILE}"; then
+            echo "QEMU ISO smoke test passed (bootstrap + connectivity probe)" | tee -a "${LOG_FILE}"
+            exit 0
+        fi
+
+        if grep -Fq " reachable" "${LOG_FILE}"; then
+            echo "QEMU ISO smoke test passed (bootstrap + connectivity probe)" | tee -a "${LOG_FILE}"
+            exit 0
+        fi
+
+        fail "expected connectivity probe success not found in captured output after ISO boot"
     fi
 
     if ! grep -Eq '^net_ip=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' "${LOG_FILE}"; then

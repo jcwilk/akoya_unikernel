@@ -9,7 +9,7 @@ Bare-metal unikernel project targeting the **Medion Akoya EX** notebook (32-bit 
 | CPU | Intel Pentium M 735 (i686, single core) |
 | RAM | ~2 GB |
 | Virtualization | Not required (no VT-x dependency) |
-| Boot | Multiboot1 via GRUB on USB (manual setup) |
+| Boot | Multiboot1 via GRUB on prepared boot media (automated ISO) |
 | Ethernet | 10/100 Mbit RJ-45 (wired LAN only for bootstrap diagnostics) |
 
 Machine-readable constants live in `target/akoya.profile`.
@@ -30,12 +30,16 @@ Development workstation (Linux):
 
 - **Node.js 20.19+** for OpenSpec Flow (`npx @fission-ai/openspec@latest …`).
 
+- **ISO packaging (workstation):** `grub-mkrescue` (package `grub-pc-bin`) and `xorriso` for `make iso` / `scripts/build-boot-iso.sh`.
+
 ## Build and test
 
 ```bash
 make build    # cross-compile bootstrap kernel → build/kernel.elf, build/kernel.bin, build/transport-test.*
 make test     # build (if needed) + headless macvtap QEMU smoke test
 make run      # build (if needed) + headful interactive macvtap QEMU session
+make iso      # build (if needed) + package BIOS/Legacy boot ISO → build/akoya-boot.iso
+make verify-iso  # package (if needed) + headless QEMU boot-from-ISO smoke (bootstrap + connectivity probe)
 make clean    # remove build/ artifacts
 ```
 
@@ -47,12 +51,15 @@ Automated verification **requires** the configured inference endpoint (`AKOYA_CH
 
 | Entry point | Purpose |
 |-------------|---------|
+| `bash scripts/build-boot-iso.sh` / `make iso` | Package `build/akoya-boot.iso` (Multiboot1 + GRUB, BIOS/Legacy) |
+| `bash scripts/verify-boot-iso.sh` / `make verify-iso` | Boot packaged ISO under QEMU; pass on bootstrap + connectivity probe (no inference pre-flight) |
 | `bash scripts/run-transport-test.sh` | Build (if needed), run `transport-test` image headlessly, exit 0 on `transport-test: ALL PASS` |
 | `bash scripts/run-qemu.sh --headless --logical kernel --script FILE` | Full-app scripted chat with output assertions (`*.akoya-script`) |
 | `bash scripts/run-qemu.sh --headless --logical kernel` | Default multi-turn scripted chat regression (`scripts/fixtures/multi-turn-pong.akoya-script`) |
+| `bash scripts/run-qemu.sh --headless --boot-iso build/akoya-boot.iso` | ISO boot smoke (bootstrap + connectivity probe only) |
 | `bash scripts/run-qemu.sh --headless --image build/transport-test.elf` | Explicit transport-test image selection when both images exist |
 
-Passing `bash scripts/run-transport-test.sh` alone does **not** satisfy the default multi-turn chat health gate; run `make test` or headless kernel scripted chat for that requirement.
+`make verify-iso` and `run-qemu.sh --boot-iso` **do not** require the inference endpoint to be reachable from the workstation. `make test` and default headless kernel runs still require inference pre-flight.
 
 When both `kernel.*` and `transport-test.*` exist under `build/`, omit `--image` / `--logical` and the runner errors with an actionable list—use `--logical kernel` or `--logical transport-test`.
 
@@ -166,9 +173,12 @@ bash scripts/run-qemu.sh --headless
 bash scripts/run-qemu.sh --headful
 bash scripts/run-qemu.sh --headful --exit-on-guest-done
 bash scripts/run-qemu.sh --headless --image build/kernel.elf
+bash scripts/run-qemu.sh --headless --boot-iso build/akoya-boot.iso
 ```
 
-**Auto-selection:** When `--image` is omitted, the script scans `build/` for runnable `*.elf` / `*.bin` stems and prefers `.elf`.
+**Boot modes:** `--image` / `--logical` load a flat kernel image with `-kernel`. `--boot-iso PATH` boots from virtual optical media (`-cdrom`, BIOS/Legacy `order=d`) and, in headless mode, uses a lighter assertion profile (bootstrap + connectivity probe only).
+
+**Auto-selection:** When `--image` is omitted and `--boot-iso` is not set, the script scans `build/` for runnable `*.elf` / `*.bin` stems and prefers `.elf`.
 
 `make test` invokes `--headless` (exits when the guest finishes). `make run` invokes `--headful` (holds the window open after the guest halts).
 
@@ -204,27 +214,71 @@ Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `buil
 | `AKOYA_CHAT_SCRIPT` | `h i ret w h a t ret q u i t ret` | Legacy headless sendkey sequence when `AKOYA_USE_KEYBOARD_SCRIPT=1` |
 | `AKOYA_USE_KEYBOARD_SCRIPT` | `0` | `1` selects `AKOYA_CHAT_SCRIPT` instead of the default multi-turn `*.akoya-script` |
 
-## Bare-metal boot (manual)
+| `AKOYA_USE_KEYBOARD_SCRIPT` | `0` | `1` selects `AKOYA_CHAT_SCRIPT` instead of the default multi-turn `*.akoya-script` |
+| `AKOYA_SKIP_INFERENCE_PREFLIGHT` | `0` | `1` skips chat-endpoint pre-flight (set by `verify-boot-iso.sh` / `--boot-iso` smoke) |
 
-Automated USB/GRUB image creation is deferred. To boot on the Akoya:
+## Bare-metal boot
 
-1. Build the kernel: `make build` → `build/kernel.bin`.
-2. Prepare a bootable USB with GRUB (BIOS/Legacy mode).
-3. Add a `multiboot` entry pointing at `kernel.bin` on the USB.
-4. Connect the Akoya RJ-45 port to a LAN with DHCP.
-5. Boot from USB; use USB-serial on COM1 and/or the laptop panel for VGA text output.
-6. Confirm console output matches the **Expected console output** section above.
+### Automated ISO (primary)
+
+1. On the development workstation, install packaging tools if needed:
+
+   ```bash
+   sudo apt install grub-pc-bin xorriso
+   ```
+
+2. Build and package:
+
+   ```bash
+   make iso
+   ```
+
+   Success prints `AKOYA_ISO_RESULT=status=success;iso=build/akoya-boot.iso;...`. The ISO volume label and GRUB menu title include the git build-id for operator identification.
+
+3. **USB flash (removable):** write the whole ISO to the device (not a partition). **Double-check the device node** — `dd` to the wrong disk is destructive.
+
+   ```bash
+   lsblk
+   sudo dd if=build/akoya-boot.iso of=/dev/sdX bs=4M status=progress conv=fsync
+   sync
+   ```
+
+   Replace `/dev/sdX` with your USB stick (e.g. `/dev/sdb`). Unplug other removable drives while selecting the target to reduce mistakes.
+
+4. **Internal boot drive:** the same whole-disk `dd` pattern applies when imaging an internal HDD/SSD intended as the boot device. Alternatively, write to a dedicated boot partition with your preferred imaging tool; ensure the firmware boot order selects that device.
+
+5. Connect the Akoya RJ-45 port to a LAN with DHCP.
+
+6. Enter the firmware boot menu (typical legacy key: F8, F12, or Esc during POST) and select **USB** or **HDD** as appropriate.
+
+7. On first boot, confirm console output matches **Expected console output** (bootstrap line, `net_ip=`, connectivity probe, then chat session).
+
+Pre-hardware confidence: run `make verify-iso` on the workstation (QEMU boot-from-ISO, bootstrap + connectivity probe; no inference pre-flight).
 
 ### Bare-metal Ethernet checklist
 
-Before expecting `net_ip=` / `net_ping=` success on hardware:
+Before expecting `net_ip=` and connectivity-probe success on hardware:
 
 - [ ] RJ-45 cable connected to a live switch or router port
 - [ ] LAN provides DHCP (same as a normal wired workstation on that network)
-- [ ] Outbound ICMP echo to the build-time probe target is allowed (some networks block ping)
-- [ ] Rebuild after probe-target DNS changes so `AKOYA_PROBE_TARGET_*` constants stay current
+- [ ] Outbound ICMP echo to the configured probe/chat host is allowed (some networks block ping)
+- [ ] Rebuild after probe-target DNS changes so build-time IP constants stay current
 
 The in-tree NIC driver targets QEMU's RTL8139 emulation first. A bare-metal driver for the Akoya EX controller is deferred until the exact chip is confirmed on hardware.
+
+## Appendix: manual GRUB/USB setup (fallback)
+
+If automated ISO packaging is unavailable on your workstation, you can prepare boot media manually:
+
+1. Build the kernel: `make build` → `build/kernel.bin`.
+2. Prepare a bootable USB with GRUB (BIOS/Legacy mode).
+3. Copy `build/kernel.elf` (or `build/kernel.bin` where your GRUB build supports flat Multiboot payloads) onto the USB.
+4. Add a `multiboot` entry pointing at the kernel file on the USB.
+5. Connect the Akoya RJ-45 port to a LAN with DHCP.
+6. Boot from USB; use USB-serial on COM1 and/or the laptop panel for VGA text output.
+7. Confirm console output matches the **Expected console output** section above.
+
+Workstation packages for the automated path: `grub-pc-bin`, `xorriso` (Debian/Ubuntu).
 
 ## OpenSpec Flow
 
