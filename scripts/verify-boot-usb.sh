@@ -12,7 +12,7 @@ usage() {
     cat >&2 <<EOF
 Usage: $0
 
-Ensure build/akoya-boot.img exists (runs build-boot-usb.sh via sudo if needed),
+Ensure build/akoya-boot.img exists (runs build-boot-usb.sh if needed),
 then boot it under QEMU as a legacy hard disk (bootstrap + connectivity probe).
 EOF
 }
@@ -29,11 +29,7 @@ fi
 
 if [[ ! -f "${IMG_PATH}" ]]; then
     echo "verify-boot-usb.sh: disk image not found; building..." >&2
-    if [[ $EUID -ne 0 ]]; then
-        sudo bash "${ROOT_DIR}/scripts/build-boot-usb.sh" || exit 1
-    else
-        bash "${ROOT_DIR}/scripts/build-boot-usb.sh" || exit 1
-    fi
+    bash "${ROOT_DIR}/scripts/build-boot-usb.sh" || exit 1
 fi
 
 if [[ ! -f "${IMG_PATH}" ]]; then

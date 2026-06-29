@@ -1,4 +1,4 @@
-.PHONY: build clean test run iso iso-deps verify-iso usb verify-usb
+.PHONY: build clean test run iso iso-deps verify-iso usb etcher verify-usb
 
 build:
 	@bash scripts/build.sh
@@ -23,6 +23,9 @@ verify-iso:
 
 usb:
 	@bash scripts/build-boot-usb.sh
+
+# Same artifact as usb — raw .img for Balena Etcher (not the .iso).
+etcher: usb
 
 verify-usb:
 	@bash scripts/verify-boot-usb.sh

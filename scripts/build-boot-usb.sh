@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Builds a BIOS/Legacy USB/HDD raw disk image (MBR + ext2 + grub-install).
+# Builds a BIOS/Legacy USB/HDD raw disk image (MBR + ext2 + GRUB BIOS boot).
 # Use this for flash drives — NOT the ISO (hybrid ISO9660 images often fail on
 # legacy BIOS with "attempt to read or write outside of disk 'hd0'").
 
@@ -10,10 +10,16 @@ BUILD_DIR="${ROOT_DIR}/build"
 KERNEL_BIN="${BUILD_DIR}/kernel.bin"
 KERNEL_ELF="${BUILD_DIR}/kernel.elf"
 IMG_PATH="${BUILD_DIR}/akoya-boot.img"
+ETCHER_LINK="${BUILD_DIR}/akoya-etcher.img"
 LOG_FILE="${BUILD_DIR}/usb-build.log"
 IMG_SIZE_MB="${AKOYA_USB_IMAGE_SIZE_MB:-64}"
 
+GRUB_MKIMAGE="${AKOYA_GRUB_MKIMAGE:-grub-mkimage}"
 GRUB_INSTALL="${AKOYA_GRUB_INSTALL:-grub-install}"
+GENEXT2FS="${AKOYA_GENEXT2FS:-genext2fs}"
+GRUB_PLATFORM_DIR="${AKOYA_GRUB_PLATFORM_DIR:-/usr/lib/grub/i386-pc}"
+
+PART_OFFSET_BYTES=$((1024 * 1024))
 
 emit_result() {
     local status="$1"
@@ -30,18 +36,6 @@ fail() {
     log "ERROR: $*"
     emit_result "failure" "$*"
     exit 1
-}
-
-require_root() {
-    if [[ $EUID -ne 0 ]]; then
-        echo "build-boot-usb.sh: requires root for loop mount and grub-install" >&2
-        echo "" >&2
-        echo "  sudo make usb" >&2
-        echo "  sudo bash scripts/build-boot-usb.sh" >&2
-        echo "" >&2
-        echo "Do not use 'make iso' output for USB sticks on legacy BIOS — use this image." >&2
-        exit 1
-    fi
 }
 
 resolve_build_id() {
@@ -61,23 +55,12 @@ ensure_kernel() {
         return 0
     fi
 
-    log "Kernel missing; running scripts/build.sh as ${SUDO_USER:-root}"
-    local -a build_cmd=(bash "${ROOT_DIR}/scripts/build.sh")
-    if [[ -n "${SUDO_USER:-}" ]]; then
-        build_cmd=(sudo -u "${SUDO_USER}" -H bash "${ROOT_DIR}/scripts/build.sh")
-    fi
-    if ! "${build_cmd[@]}"; then
+    log "Kernel missing; running scripts/build.sh"
+    if ! bash "${ROOT_DIR}/scripts/build.sh"; then
         fail "kernel build failed"
     fi
     if [[ ! -f "${KERNEL_BIN}" || ! -f "${KERNEL_ELF}" ]]; then
         fail "kernel build did not produce ${KERNEL_BIN} and ${KERNEL_ELF}"
-    fi
-}
-
-restore_ownership() {
-    if [[ -n "${SUDO_USER:-}" ]]; then
-        chown "${SUDO_USER}:${SUDO_USER}" "${IMG_PATH}" "${LOG_FILE}" 2>/dev/null || true
-        chown -R "${SUDO_USER}:${SUDO_USER}" "${BUILD_DIR}" 2>/dev/null || true
     fi
 }
 
@@ -98,71 +81,107 @@ menuentry "Akoya Unikernel ${build_id}" {
 EOF
 }
 
-main() {
-    require_root
+install_grub_with_mkimage() {
+    local disk_img="$1"
 
-    if ! command -v "${GRUB_INSTALL}" >/dev/null 2>&1; then
-        fail "grub-install not found; install grub-pc-bin (sudo apt install grub-pc-bin)"
+    if ! command -v "${GRUB_MKIMAGE}" >/dev/null 2>&1; then
+        fail "grub-mkimage not found; install grub-pc-bin (apt install grub-pc-bin)"
     fi
-    if ! command -v losetup >/dev/null 2>&1 || ! command -v mkfs.ext2 >/dev/null 2>&1; then
-        fail "losetup and mkfs.ext2 required (e2fsprogs package)"
+    if [[ ! -f "${GRUB_PLATFORM_DIR}/boot.img" ]]; then
+        fail "GRUB i386-pc boot.img not found under ${GRUB_PLATFORM_DIR}; install grub-pc-bin"
+    fi
+
+    local core_img
+    core_img="$(mktemp /tmp/akoya-usb-core.XXXXXX.img)"
+
+    log "Embedding GRUB core image (grub-mkimage) for ${disk_img}"
+    "${GRUB_MKIMAGE}" \
+        -d "${GRUB_PLATFORM_DIR}" \
+        -O i386-pc \
+        -o "${core_img}" \
+        -p "(hd0,msdos1)/boot/grub" \
+        biosdisk boot ext2 part_msdos multiboot serial normal configfile >>"${LOG_FILE}" 2>&1
+
+    dd if="${GRUB_PLATFORM_DIR}/boot.img" of="${disk_img}" conv=notrunc bs=440 count=1 status=none >>"${LOG_FILE}" 2>&1
+    dd if="${core_img}" of="${disk_img}" conv=notrunc bs=512 seek=1 status=none >>"${LOG_FILE}" 2>&1
+    rm -f "${core_img}"
+}
+
+install_grub_to_disk_image() {
+    local disk_img="$1"
+    local staging_boot="$2"
+
+    if command -v "${GRUB_INSTALL}" >/dev/null 2>&1; then
+        log "Installing GRUB to MBR on ${disk_img} (grub-install)"
+        if "${GRUB_INSTALL}" \
+            --target=i386-pc \
+            --boot-directory="${staging_boot}" \
+            --modules="multiboot serial normal configfile part_msdos ext2 biosdisk" \
+            --disk-module=biosdisk \
+            --skip-fs-probe \
+            --force \
+            "${disk_img}" >>"${LOG_FILE}" 2>&1; then
+            return 0
+        fi
+        log "grub-install to disk image failed; falling back to grub-mkimage embedding"
+    fi
+
+    install_grub_with_mkimage "${disk_img}"
+}
+
+main() {
+    mkdir -p "${BUILD_DIR}"
+
+    if ! command -v "${GENEXT2FS}" >/dev/null 2>&1; then
+        fail "genext2fs not found; install genext2fs (apt install genext2fs)"
     fi
     if ! command -v sfdisk >/dev/null 2>&1; then
-        fail "sfdisk required (util-linux package)"
+        fail "sfdisk required (util-linux package; apt install util-linux)"
+    fi
+    if ! command -v dd >/dev/null 2>&1; then
+        fail "dd required (coreutils package)"
     fi
 
-    mkdir -p "${BUILD_DIR}"
     : > "${LOG_FILE}"
 
     ensure_kernel
 
-    local build_id mount_dir loop_dev part_dev
+    local build_id staging_dir part_img part_size_bytes
     build_id="$(resolve_build_id)"
+    part_size_bytes=$((IMG_SIZE_MB * 1024 * 1024 - PART_OFFSET_BYTES))
 
-    mount_dir="$(mktemp -d /tmp/akoya-usb-mount.XXXXXX)"
-    trap 'umount -f "${mount_dir}" 2>/dev/null || true; losetup -d "${loop_dev:-}" 2>/dev/null || true; rm -rf "${mount_dir}"; restore_ownership' EXIT
+    staging_dir="$(mktemp -d /tmp/akoya-usb-staging.XXXXXX)"
+    part_img="$(mktemp /tmp/akoya-usb-part.XXXXXX.img)"
+    trap 'rm -rf "${staging_dir:-}" "${part_img:-}"' EXIT
+
+    mkdir -p "${staging_dir}/boot/grub"
+    cp "${KERNEL_ELF}" "${staging_dir}/boot/kernel.elf"
+    write_grub_cfg "${staging_dir}/boot/grub/grub.cfg" "${build_id}"
+
+    log "Building ext2 partition image (${part_size_bytes} bytes) with genext2fs"
+    "${GENEXT2FS}" \
+        -L "AKOYA-${build_id:0:24}" \
+        -b $((part_size_bytes / 1024)) \
+        -d "${staging_dir}" \
+        "${part_img}" >>"${LOG_FILE}" 2>&1
 
     log "Creating ${IMG_SIZE_MB} MiB disk image: ${IMG_PATH}"
     truncate -s "${IMG_SIZE_MB}M" "${IMG_PATH}"
 
     printf 'label: dos\nstart=1MiB, type=83, bootable\n' | sfdisk "${IMG_PATH}" >>"${LOG_FILE}" 2>&1
 
-    loop_dev="$(losetup -fP --show "${IMG_PATH}")"
-    part_dev="${loop_dev}p1"
-    if [[ ! -e "${part_dev}" ]]; then
-        part_dev="${loop_dev}1"
-    fi
-    if [[ ! -e "${part_dev}" ]]; then
-        fail "partition device not found after losetup (tried ${loop_dev}p1 and ${loop_dev}1)"
-    fi
+    log "Writing partition into disk image at 1 MiB offset"
+    dd if="${part_img}" of="${IMG_PATH}" bs=1M seek=1 conv=notrunc status=none >>"${LOG_FILE}" 2>&1
 
-    log "Formatting ext2 on ${part_dev}"
-    mkfs.ext2 -F -L "AKOYA-${build_id:0:24}" "${part_dev}" >>"${LOG_FILE}" 2>&1
+    install_grub_to_disk_image "${IMG_PATH}" "${staging_dir}/boot"
 
-    mount "${part_dev}" "${mount_dir}"
-    mkdir -p "${mount_dir}/boot/grub"
-    cp "${KERNEL_ELF}" "${mount_dir}/boot/kernel.elf"
-    write_grub_cfg "${mount_dir}/boot/grub/grub.cfg" "${build_id}"
-
-    log "Installing GRUB to MBR on ${loop_dev}"
-    "${GRUB_INSTALL}" \
-        --target=i386-pc \
-        --boot-directory="${mount_dir}/boot" \
-        --modules="multiboot serial normal configfile part_msdos ext2 biosdisk" \
-        --force \
-        "${loop_dev}" >>"${LOG_FILE}" 2>&1
-
-    umount "${mount_dir}"
-    losetup -d "${loop_dev}"
-    loop_dev=""
-    rm -rf "${mount_dir}"
-    mount_dir=""
-
-    restore_ownership
+    ln -sf "$(basename "${IMG_PATH}")" "${ETCHER_LINK}"
 
     log "USB/HDD image ready: ${IMG_PATH} (${IMG_SIZE_MB} MiB MBR + ext2 + GRUB)"
-    log "Write to whole USB device: sudo dd if=${IMG_PATH} of=/dev/sdX bs=4M status=progress conv=fsync"
-    emit_result "success" "usb-image-ready"
+    log "Etcher: flash ${ETCHER_LINK} or ${IMG_PATH} (Balena Etcher → Flash from file → select the .img)"
+    log "Do not flash build/akoya-boot.iso on legacy BIOS USB — use this .img instead (ISO is optical/QEMU only)."
+    log "Alternative: dd if=${IMG_PATH} of=/dev/sdX bs=4M status=progress conv=fsync (requires access to the USB block device)"
+    emit_result "success" "usb-image-ready;etcher=${ETCHER_LINK}"
 }
 
 main "$@"
