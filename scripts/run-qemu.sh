@@ -30,6 +30,7 @@ MODE=""
 IMAGE_PATH=""
 LOGICAL_ID=""
 BOOT_ISO_PATH=""
+BOOT_DISK_PATH=""
 ISO_SMOKE=0
 SCRIPT_FILE=""
 SCRIPT_INJECT_STATUS=0
@@ -38,13 +39,14 @@ EXIT_ON_GUEST_DONE=""
 
 usage() {
     cat >&2 <<EOF
-Usage: $0 (--headful|--headless) [--image PATH | --logical NAME | --boot-iso PATH] [--script FILE] [--exit-on-guest-done | --hold]
+Usage: $0 (--headful|--headless) [--image PATH | --logical NAME | --boot-iso PATH | --boot-disk PATH] [--script FILE] [--exit-on-guest-done | --hold]
 
   --headful     Interactive SDL display window
   --headless    No display; smoke-test timeout and bootstrap/network assertions
   --image PATH  Boot image to run (default: auto-select when exactly one logical image exists)
   --logical NAME  Select logical image stem (e.g. kernel, transport-test)
-  --boot-iso PATH  Boot from BIOS/Legacy optical media (mutually exclusive with --image / --logical)
+  --boot-iso PATH  Boot from BIOS/Legacy optical media (mutually exclusive with --image / --logical / --boot-disk)
+  --boot-disk PATH Boot from raw MBR disk image as first hard disk (USB/HDD image from make usb)
   --script FILE Headless scripted chat interaction with output assertions (*.akoya-script)
 
   --exit-on-guest-done  QEMU exits when the guest finishes (default for --headless)
@@ -66,8 +68,9 @@ Environment:
   AKOYA_LAN_LIBEXEC       Installed helper scripts for passwordless sudo (default: /usr/local/libexec/akoya)
   AKOYA_SKIP_INFERENCE_PREFLIGHT  1 = skip chat-endpoint pre-flight (ISO smoke / verify-boot-iso)
 
-ISO boot (--boot-iso) uses BIOS/Legacy optical boot order and, in headless mode, a lighter
-assertion profile: bootstrap message plus connectivity-probe success only (no multi-turn chat).
+ISO boot (--boot-iso) uses BIOS/Legacy optical media. Disk boot (--boot-disk) uses -hda
+(boot order c) for akoya-boot.img from make usb. Both skip inference pre-flight in
+headless mode and assert bootstrap + connectivity probe only.
 
 Install ${LAN_LIBEXEC}/qemu-bridge-{up,down}.sh with matching sudoers; see README.
 
@@ -354,6 +357,11 @@ while [[ $# -gt 0 ]]; do
             ISO_SMOKE=1
             shift 2
             ;;
+        --boot-disk)
+            BOOT_DISK_PATH="$2"
+            ISO_SMOKE=1
+            shift 2
+            ;;
         --script)
             SCRIPT_FILE="$2"
             shift 2
@@ -387,11 +395,21 @@ if [[ -z "${MODE}" ]]; then
 fi
 
 if [[ -n "${BOOT_ISO_PATH}" ]]; then
-    if [[ -n "${IMAGE_PATH}" || -n "${LOGICAL_ID}" ]]; then
-        fail "specify only one of --boot-iso PATH, --image PATH, or --logical NAME"
+    if [[ -n "${IMAGE_PATH}" || -n "${LOGICAL_ID}" || -n "${BOOT_DISK_PATH}" ]]; then
+        fail "specify only one of --boot-iso, --boot-disk, --image, or --logical"
     fi
     if [[ ! -f "${BOOT_ISO_PATH}" ]]; then
         fail "boot ISO not found: ${BOOT_ISO_PATH}"
+    fi
+    ISO_SMOKE=1
+fi
+
+if [[ -n "${BOOT_DISK_PATH}" ]]; then
+    if [[ -n "${IMAGE_PATH}" || -n "${LOGICAL_ID}" || -n "${BOOT_ISO_PATH}" ]]; then
+        fail "specify only one of --boot-iso, --boot-disk, --image, or --logical"
+    fi
+    if [[ ! -f "${BOOT_DISK_PATH}" ]]; then
+        fail "boot disk image not found: ${BOOT_DISK_PATH}"
     fi
     ISO_SMOKE=1
 fi
@@ -606,8 +624,10 @@ main() {
         fi
     fi
 
-    if [[ "${ISO_SMOKE}" -eq 1 ]]; then
+    if [[ "${ISO_SMOKE}" -eq 1 && -n "${BOOT_ISO_PATH}" ]]; then
         qemu_args+=(-boot order=d -cdrom "${BOOT_ISO_PATH}")
+    elif [[ "${ISO_SMOKE}" -eq 1 && -n "${BOOT_DISK_PATH}" ]]; then
+        qemu_args+=(-boot order=c -hda "${BOOT_DISK_PATH}")
     else
         qemu_args+=(-kernel "${kernel_image}")
     fi
