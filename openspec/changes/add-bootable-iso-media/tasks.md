@@ -10,14 +10,14 @@
 ## 2. QEMU boot-from-ISO path
 
 - [ ] 2.1 Extend `scripts/run-qemu.sh` with `--boot-iso PATH` (mutually exclusive with `--image` / `--logical`) to boot the guest from optical media using BIOS/Legacy boot order
-- [ ] 2.2 Reuse existing macvtap LAN attachment, serial capture, headless timeout, and bootstrap assertion logic when booting from ISO
+- [ ] 2.2 Reuse existing macvtap LAN attachment, serial capture, and headless timeout when booting from ISO; support a lighter assertion profile (bootstrap + connectivity-probe success only) distinct from default multi-turn chat smoke
 - [ ] 2.3 Document `--boot-iso` in `run-qemu.sh` usage text and README
 
 ## 3. ISO verification entry point
 
-- [ ] 3.1 Add `scripts/verify-boot-iso.sh`: ensure ISO exists (call packaging script if needed), run headless `--boot-iso` smoke with inference pre-flight, exit 0 on bootstrap + configured network/chat assertions
+- [ ] 3.1 Add `scripts/verify-boot-iso.sh`: ensure ISO exists (call packaging script if needed), run headless `--boot-iso` smoke without inference pre-flight, exit 0 on bootstrap diagnostic message plus successful connectivity probe to the build-configured probe target (default `google.com`)
 - [ ] 3.2 Add `make verify-iso` Makefile target (or document `verify-boot-iso.sh` as the agent entry point in README)
-- [ ] 3.3 Capture verification evidence: successful run log showing ISO boot path and bootstrap diagnostic message in `build/` or console output referenced in apply notes
+- [ ] 3.3 Capture verification evidence: successful run log showing ISO boot path, bootstrap diagnostic message, and successful connectivity-probe output in `build/` or console output referenced in apply notes
 
 ## 4. Documentation
 

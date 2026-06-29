@@ -44,11 +44,12 @@ Add `scripts/verify-boot-iso.sh` that:
 
 1. Ensures ISO exists (calls packaging script if absent).
 2. Invokes the existing QEMU runner with a new `--boot-iso PATH` mode (or dedicated internal flag) so the guest boots from optical media instead of `-kernel`.
-3. Runs headless with bootstrap (and existing network/chat smoke assertions where LAN preconditions hold), reusing macvtap and inference pre-flight from `run-qemu.sh`.
+3. Runs headless with a **lighter gate than default multi-turn chat smoke**: bootstrap diagnostic message plus successful outbound connectivity probe (default build probe target is `google.com` via `AKOYA_PROBE_HOST`). Reuse macvtap LAN attachment and serial capture from `run-qemu.sh`.
+4. **Does not** require inference-endpoint pre-flight or chat-completion assertions—connectivity-probe success is sufficient evidence that the ISO booted and wired networking works.
 
-**Rationale:** Boot-from-ISO is a distinct code path from `-kernel`; a dedicated verify script keeps agent entry points obvious while sharing LAN/assertion logic.
+**Rationale:** Boot-from-ISO is a distinct code path from `-kernel`; a dedicated verify script keeps agent entry points obvious while sharing LAN infrastructure. Ping success proves bootloader wiring, kernel execution, DHCP, and outbound IP reachability without coupling ISO packaging validation to llama.cpp availability.
 
-**Alternative:** Separate one-off QEMU invocation duplicated from `run-qemu.sh` — rejected to avoid drift.
+**Alternative:** Reuse full default smoke gate — rejected; operator goal is pre-shipment boot-media confidence, not chat regression on every ISO build.
 
 ### Writable media operator flow
 

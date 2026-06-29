@@ -2,16 +2,26 @@
 
 ### Requirement: Packaged ISO verification under emulation
 
-The project SHALL provide a documented development-workstation entry point that boots the packaged ISO under 32-bit x86 emulation and verifies that the guest reaches the same observable bootstrap success as the direct-kernel smoke path.
+The project SHALL provide a documented development-workstation entry point that boots the packaged ISO under 32-bit x86 emulation and verifies that the guest booted successfully and completed wired-network bring-up. Pass for this entry point SHALL require the bootstrap diagnostic message and a successful outbound connectivity probe to the build-configured probe target. It SHALL NOT require chat-completion exchange or inference-endpoint availability beyond what the connectivity probe itself needs.
 
 #### Scenario: Headless ISO boot smoke test
 
 - **GIVEN** a successfully produced boot ISO on the development workstation
 - **AND** workstation emulation and LAN attachment prerequisites are satisfied
+- **AND** the workstation LAN provides DHCP and allows the guest connectivity probe to succeed
 - **WHEN** an agent or human invokes the documented ISO verification entry point in headless mode
 - **THEN** the emulator boots from the ISO as optical media rather than loading a flat kernel image directly
 - **AND** captured console output contains the bootstrap diagnostic message
-- **AND** the process exits with success when bootstrap and configured smoke assertions pass
+- **AND** captured console output shows a successful outbound connectivity probe result for the build-configured probe target
+- **AND** the process exits with success without running multi-turn chat regression
+
+#### Scenario: ISO verification does not require inference endpoint
+
+- **GIVEN** the configured chat or inference endpoint is unreachable from the development workstation
+- **AND** the workstation LAN still allows the guest connectivity probe to succeed
+- **WHEN** the ISO verification entry point runs in headless mode
+- **THEN** verification may still pass when bootstrap and connectivity-probe assertions succeed
+- **AND** failure is not reported solely because chat-completion infrastructure is unavailable
 
 #### Scenario: ISO verification without existing ISO
 
@@ -22,10 +32,10 @@ The project SHALL provide a documented development-workstation entry point that 
 
 #### Scenario: ISO boot failure is actionable
 
-- **GIVEN** a corrupt or non-booting ISO artifact
+- **GIVEN** a corrupt or non-booting ISO artifact, or a booted guest that never reports connectivity-probe success
 - **WHEN** the ISO verification entry point runs in headless mode
 - **THEN** the runner exits with non-zero status within the configured timeout
-- **AND** failure output indicates that expected bootstrap console output was not observed after booting from the ISO
+- **AND** failure output indicates which expected bootstrap or connectivity-probe output was not observed after booting from the ISO
 
 ### Requirement: ISO verification preserves LAN-attached emulation
 

@@ -6,7 +6,7 @@ The project can cross-compile a bootable kernel and validate it under QEMU by lo
 
 - Add a single documented packaging entry point that turns a successful kernel build into a BIOS/Legacy-bootable ISO suitable for writing to removable flash media or an internal boot drive.
 - Package the production chat unikernel (not transport-test) as the default boot payload, using the deployment target's Multiboot1 boot protocol.
-- Extend pre-hardware verification so agents can boot the packaged ISO under emulation and assert the same bootstrap and network diagnostic behavior as the existing direct-image smoke path.
+- Extend pre-hardware verification so agents can boot the packaged ISO under emulation and assert bootstrap success plus a successful outbound connectivity probe (sufficient to confirm the image booted and wired networking works; no chat-completion gate).
 - Document how operators write the ISO to USB or internal storage and what to expect on first bare-metal boot.
 - Replace the README's deferred "manual USB/GRUB" note with a first-class automated path while keeping transport-test and direct-kernel QEMU paths unchanged.
 
@@ -18,7 +18,7 @@ The project can cross-compile a bootable kernel and validate it under QEMU by lo
 
 ### Modified Capabilities
 
-- `dev-test-runner`: Add a verification path that boots the packaged ISO under emulation (not only a direct kernel image) and gates on observable bootstrap success.
+- `dev-test-runner`: Add a verification path that boots the packaged ISO under emulation (not only a direct kernel image) and gates on bootstrap success plus connectivity-probe success, without requiring chat-completion regression.
 - `deployment-target`: Codify that deployment boot media SHALL support BIOS/Legacy boot from removable USB flash and from written internal boot storage on target-class hardware.
 
 ## Impact
