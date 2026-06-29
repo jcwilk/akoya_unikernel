@@ -1,6 +1,4 @@
 .env
 build/
-build/*.iso
-build/*.img
 tools/
 *.log
