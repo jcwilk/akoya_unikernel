@@ -5,4 +5,6 @@
 
 int rtl8139_init(eth_device_t *dev);
 
+void rtl8139_drain_tx(void);
+
 #endif

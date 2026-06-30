@@ -10,6 +10,7 @@
 #define RTL8139_DEVICE 0x8139
 
 #define RTL8139_IDR0      0x00
+#define RTL8139_MAR0      0x08
 #define RTL8139_RBSTART   0x30
 #define RTL8139_CMD       0x37
 #define RTL8139_CAPR      0x38
@@ -21,10 +22,18 @@
 #define RTL8139_RCR       0x44
 #define RTL8139_TCR       0x40
 #define RTL8139_CONFIG1   0x52
+#define RTL8139_HLTCLK    0x5B
+#define RTL8139_BMSR      0x64
 
 #define RTL8139_CMD_RESET 0x10
 #define RTL8139_CMD_RX_EN 0x08
 #define RTL8139_CMD_TX_EN 0x04
+
+#define RTL8139_ISR_RX_OK       0x0001U
+#define RTL8139_ISR_RX_OVERFLOW 0x0008U
+
+#define RTL8139_RX_IN_PROGRESS  0xFFF0U
+#define RTL8139_RX_FRAME_MAX    1600U
 
 #define RX_BUF_SIZE 8192
 #define TX_BUF_SIZE 1792
@@ -34,6 +43,11 @@ static uint8_t tx_cur;
 static uint8_t rx_buffer[RX_BUF_SIZE + 16] __attribute__((aligned(4)));
 static uint8_t tx_slots[4][TX_BUF_SIZE] __attribute__((aligned(4)));
 static uint16_t rx_offset;
+
+static inline void rtl8139_memory_barrier(void)
+{
+    __asm__ volatile ("" ::: "memory");
+}
 
 static uint16_t rtl8139_read16(uint16_t offset)
 {
@@ -55,6 +69,38 @@ static void rtl8139_write32(uint16_t offset, uint32_t value)
     outl((uint16_t)(io_base + offset), value);
 }
 
+static void rtl8139_accept_all_multicast(void)
+{
+    /* MAR must be written as 32-bit accesses (OSDev / datasheet). */
+    rtl8139_write32(RTL8139_MAR0, 0xFFFFFFFFU);
+    rtl8139_write32(RTL8139_MAR0 + 4U, 0xFFFFFFFFU);
+}
+
+static int rtl8139_link_is_up(void)
+{
+    return (rtl8139_read16(RTL8139_BMSR) & 0x0004U) != 0;
+}
+
+static void rtl8139_wait_for_link(uint32_t timeout_ms)
+{
+    uint32_t deadline = time_millis() + timeout_ms;
+
+    while (time_millis() < deadline) {
+        if (rtl8139_link_is_up()) {
+            return;
+        }
+        time_delay_ms(100U);
+    }
+}
+
+static void rtl8139_program_tx_slots(void)
+{
+    for (int i = 0; i < 4; i++) {
+        rtl8139_write32((uint16_t)(RTL8139_TSAD0 + (uint16_t)i * 4U),
+                        (uint32_t)(uintptr_t)tx_slots[i]);
+    }
+}
+
 static int rtl8139_reset(void)
 {
     rtl8139_write8(RTL8139_CMD, RTL8139_CMD_RESET);
@@ -65,6 +111,35 @@ static int rtl8139_reset(void)
         time_delay_ms(1);
     }
     return -1;
+}
+
+static void rtl8139_rx_soft_reset(void)
+{
+    uint8_t cmd = inb((uint16_t)(io_base + RTL8139_CMD));
+
+    rtl8139_write8(RTL8139_CMD, (uint8_t)(cmd & (uint8_t)~RTL8139_CMD_RX_EN));
+    rx_offset = 0;
+    rtl8139_write16(RTL8139_CAPR, 0xFFF0U);
+    rtl8139_write16(RTL8139_ISR, 0xFFFFU);
+    rtl8139_write8(RTL8139_CMD, (uint8_t)(cmd | RTL8139_CMD_RX_EN));
+    rtl8139_memory_barrier();
+    rx_offset = 0;
+}
+
+static void rtl8139_service_isr(void)
+{
+    uint16_t isr = rtl8139_read16(RTL8139_ISR);
+    if (isr == 0U) {
+        return;
+    }
+
+    if ((isr & RTL8139_ISR_RX_OVERFLOW) != 0U) {
+        rtl8139_rx_soft_reset();
+        rtl8139_write16(RTL8139_ISR, RTL8139_ISR_RX_OK);
+        return;
+    }
+
+    rtl8139_write16(RTL8139_ISR, isr);
 }
 
 static uint32_t rtl8139_read32(uint16_t offset)
@@ -79,6 +154,17 @@ static int rtl8139_tx_done(uint8_t entry)
         return 1;
     }
     return (tsd & 0x00006000U) != 0U;
+}
+
+void rtl8139_drain_tx(void)
+{
+    for (int entry = 0; entry < 4; entry++) {
+        for (int i = 0; i < 50000; i++) {
+            if (rtl8139_tx_done((uint8_t)entry)) {
+                break;
+            }
+        }
+    }
 }
 
 static int rtl8139_send(eth_device_t *dev, const uint8_t *frame, uint16_t length)
@@ -112,6 +198,7 @@ static int rtl8139_send(eth_device_t *dev, const uint8_t *frame, uint16_t length
     uint16_t tsd_reg = (uint16_t)(RTL8139_TSD0 + (uint16_t)entry * 4U);
 
     rtl8139_write32(tsad_reg, (uint32_t)(uintptr_t)tx_slots[entry]);
+    rtl8139_memory_barrier();
     rtl8139_write32(tsd_reg, tx_len);
     tx_cur = (uint8_t)((entry + 1U) % 4U);
     return 0;
@@ -121,10 +208,7 @@ static int rtl8139_poll(eth_device_t *dev, uint8_t *frame, uint16_t capacity, ui
 {
     (void)dev;
 
-    uint16_t isr = rtl8139_read16(RTL8139_ISR);
-    if (isr & 0x0001U) {
-        rtl8139_write16(RTL8139_ISR, 0x0001U);
-    }
+    rtl8139_service_isr();
 
     if ((inb((uint16_t)(io_base + RTL8139_CMD)) & 0x01U) != 0) {
         return 1;
@@ -140,8 +224,13 @@ static int rtl8139_poll(eth_device_t *dev, uint8_t *frame, uint16_t capacity, ui
     }
 
     uint16_t total_len = (uint16_t)((status >> 16) & 0x0FFFU);
-    if (total_len < 4U || total_len > capacity + 4U) {
-        return -1;
+    if (total_len == RTL8139_RX_IN_PROGRESS) {
+        return 1;
+    }
+
+    if (total_len < 4U || total_len > RTL8139_RX_FRAME_MAX
+        || total_len > (uint16_t)(capacity + 4U)) {
+        return 1;
     }
 
     uint16_t copy_len = (uint16_t)(total_len - 4U);
@@ -178,6 +267,10 @@ int rtl8139_init(eth_device_t *dev)
 
     pci_enable_device(&pci);
 
+    /* Power on / wake (QEMU ignores; real RTL8139 needs this). */
+    rtl8139_write8(RTL8139_CONFIG1, 0x00);
+    rtl8139_write8(RTL8139_HLTCLK, (uint8_t)'R');
+
     if (rtl8139_reset() != 0) {
         return -1;
     }
@@ -188,12 +281,15 @@ int rtl8139_init(eth_device_t *dev)
 
     rtl8139_write32(RTL8139_RBSTART, (uint32_t)(uintptr_t)rx_buffer);
     rtl8139_write16(RTL8139_CAPR, 0xFFF0U);
+    rtl8139_accept_all_multicast();
+    rtl8139_write8(RTL8139_CMD, RTL8139_CMD_RX_EN | RTL8139_CMD_TX_EN);
     rtl8139_write32(RTL8139_RCR, 0x0000000FU | 0x00000080U);
     rtl8139_write32(RTL8139_TCR, 0x03000700U);
-    rtl8139_write8(RTL8139_CONFIG1, 0x20);
+    rtl8139_program_tx_slots();
     rtl8139_write16(RTL8139_IMR, 0x0005U);
     rtl8139_write16(RTL8139_ISR, 0xFFFFU);
-    rtl8139_write8(RTL8139_CMD, RTL8139_CMD_RX_EN | RTL8139_CMD_TX_EN);
+
+    rtl8139_wait_for_link(5000U);
 
     dev->init = rtl8139_init;
     dev->send = rtl8139_send;

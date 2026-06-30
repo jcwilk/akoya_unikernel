@@ -94,6 +94,7 @@ void console_init(void)
     vga_row = 0;
     vga_col = 0;
     serial_init();
+    console_clear();
 }
 
 void console_write(const char *message)

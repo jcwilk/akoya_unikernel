@@ -30,3 +30,9 @@ const eth_addr_t *eth_mac(const eth_device_t *dev)
     }
     return &dev->mac;
 }
+
+void eth_drain_tx(const eth_device_t *dev)
+{
+    (void)dev;
+    rtl8139_drain_tx();
+}

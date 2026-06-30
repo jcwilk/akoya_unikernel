@@ -18,5 +18,6 @@ int eth_init(eth_device_t *dev);
 int eth_send(eth_device_t *dev, const uint8_t *frame, uint16_t length);
 int eth_poll(eth_device_t *dev, uint8_t *frame, uint16_t capacity, uint16_t *length_out);
 const eth_addr_t *eth_mac(const eth_device_t *dev);
+void eth_drain_tx(const eth_device_t *dev);
 
 #endif
