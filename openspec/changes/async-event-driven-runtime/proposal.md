@@ -4,7 +4,8 @@ The bootstrap unikernel today runs network bootstrap and the interactive chat se
 
 ## What Changes
 
-- Introduce a **guest event runtime**: a single main loop that advances non-blocking work for every active interface (keyboard input, wired receive/transmit, protocol state machines, chat session state, scheduled timers) and yields CPU when nothing is pending.
+- Add **shared deferred device bottom-half** framework for keyboard and wired NIC (pending → mask → drain-until-quiescent → unmask → follow-up poll).
+- **Bounded work per loop visit**; re-arm pending when backlog remains.
 - Replace **blocking waits** for operator input, inbound network data, outbound transport progress, and timed idle gaps with **event-scheduled progression**; only operations that complete in bounded immediate hardware time may stall the loop.
 - Add **interrupt infrastructure** on the guest so wired NIC and keyboard activity can wake the runtime from idle without continuous polling (aligned with deployment-unit IRQ assignment for the RTL8139 and standard AT keyboard path).
 - Refactor **network bootstrap and chat** into explicit state machines driven by the event runtime while keeping the same console-visible bootstrap order, per-turn transport lifecycle, and session semantics.
@@ -15,7 +16,7 @@ The bootstrap unikernel today runs network bootstrap and the interactive chat se
 
 ### New Capabilities
 
-- `guest-event-runtime`: Central cooperative event loop, non-blocking execution policy, interface servicing order, CPU idle when quiescent, and hardware-wakeup integration for keyboard and wired network.
+- `guest-event-runtime`: Central cooperative event loop, deferred device bottom-halves (shared keyboard/NIC contract), bounded work per visit, CPU idle when quiescent, and hardware-wakeup integration.
 
 ### Modified Capabilities
 

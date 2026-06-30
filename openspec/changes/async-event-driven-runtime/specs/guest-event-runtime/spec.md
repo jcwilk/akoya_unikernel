@@ -100,3 +100,50 @@ The event runtime SHALL integrate hardware signaling for operator keyboard input
 - **WHEN** an inbound wired frame for the active exchange arrives
 - **THEN** the runtime resumes and the exchange state machine advances
 - **AND** the resume does not require the operator to provide input
+
+### Requirement: Deferred device bottom-half servicing
+
+Integrated keyboard and wired network activity SHALL use the same deferred servicing contract. A hardware interrupt SHALL mark the device as pending and suppress further interrupts for that device until its bottom-half pass completes. The event runtime SHALL run the bottom half only when the device is pending, drain until the device hardware is quiescent, re-enable interrupts for that device, perform one follow-up check for additional hardware work, and clear pending only when quiescent.
+
+#### Scenario: Interrupt schedules bottom half without immediate drain
+
+- **GIVEN** the event runtime is advancing another category of work
+- **WHEN** integrated keyboard or wired network hardware signals activity
+- **THEN** the device is marked pending for a bottom-half pass
+- **AND** the interrupted work completes its current bounded slice before the bottom half runs
+- **AND** protocol or chat logic does not run inside the hardware interrupt context
+
+#### Scenario: Bottom half drains until quiescent before re-enabling interrupts
+
+- **GIVEN** a device is pending for bottom-half service
+- **WHEN** the event runtime reaches that device's slot
+- **THEN** the runtime drains available hardware work until the device is quiescent
+- **AND** interrupts for that device are re-enabled only after the drain completes
+- **AND** one follow-up check runs after re-enable before pending is cleared
+- **AND** pending remains set if the follow-up check finds more hardware work
+
+#### Scenario: Keyboard and wired network share servicing semantics
+
+- **GIVEN** both integrated keyboard and wired network are registered with the runtime
+- **WHEN** each device signals hardware activity
+- **THEN** both use the same pending, mask, deferred bottom-half, drain, unmask, and follow-up check sequence
+- **AND** observable servicing order remains deterministic for a given loop pass
+
+### Requirement: Bounded work per runtime visit
+
+Each event-runtime slot—including device bottom halves, protocol state machines, and chat controller steps—SHALL perform only bounded work on a single visit. If more work remains after that bound, the slot SHALL remain active or re-arm pending for the next loop pass rather than monopolizing the runtime until the full backlog is exhausted.
+
+#### Scenario: Deep wired backlog yields across passes
+
+- **GIVEN** multiple inbound wired frames arrived while a chat turn is in progress
+- **WHEN** the wired network bottom-half slot runs
+- **THEN** the runtime processes only a bounded amount of wired work on that visit
+- **AND** remaining wired work stays pending for a subsequent loop pass
+- **AND** timer and chat slots still receive service on the same loop pass when they are active
+
+#### Scenario: Device pending re-arms when work remains
+
+- **GIVEN** a device bottom-half drain reaches its per-visit bound while hardware still has more work
+- **WHEN** the slot ends for that visit
+- **THEN** the device remains pending for the next loop pass
+- **AND** the runtime does not report the device as quiescent until hardware work is fully drained
