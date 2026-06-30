@@ -40,20 +40,7 @@
 
 #define HTTP_CHAT_RECV_CAP 4096U
 #define HTTP_CHAT_REPLY_CONSOLE_MAX 256U
-#define CHAT_MSG_MAX_LEN 128U
-#define CHAT_HISTORY_MAX_TURNS 16U
 #define CHAT_JSON_BUDGET 8192U
-
-typedef struct {
-    char user[CHAT_MSG_MAX_LEN];
-    char assistant[CHAT_MSG_MAX_LEN];
-    int has_assistant;
-} chat_turn_t;
-
-typedef struct {
-    chat_turn_t turns[CHAT_HISTORY_MAX_TURNS];
-    int count;
-} chat_history_t;
 
 static int find_substr(const char *haystack, int hay_len, const char *needle)
 {
@@ -181,10 +168,20 @@ static void emit_fail(const char *reason)
     console_write_line(reason);
 }
 
+void http_chat_emit_fail(const char *reason)
+{
+    emit_fail(reason);
+}
+
 static void emit_ok(const char *reply)
 {
     console_write_reply_truncated(reply);
     console_newline();
+}
+
+void http_chat_emit_ok(const char *reply)
+{
+    emit_ok(reply);
 }
 
 static void format_host_ip(char *host, int cap)
@@ -261,20 +258,22 @@ static int is_exit_command(const char *line)
     return str_eq_ci(line, "quit") || str_eq_ci(line, "exit");
 }
 
-static void chat_history_init(chat_history_t *history)
+static int estimate_json_size(const http_chat_history_t *history);
+
+void http_chat_history_init(http_chat_history_t *history)
 {
     history->count = 0;
 }
 
-static int chat_history_add_user(chat_history_t *history, const char *msg)
+int http_chat_history_add_user(http_chat_history_t *history, const char *msg)
 {
-    if (history->count >= (int)CHAT_HISTORY_MAX_TURNS) {
+    if (history->count >= (int)HTTP_CHAT_HISTORY_MAX_TURNS) {
         return -1;
     }
 
-    chat_turn_t *turn = &history->turns[history->count];
+    http_chat_turn_t *turn = &history->turns[history->count];
     int i = 0;
-    while (msg[i] != '\0' && i < (int)CHAT_MSG_MAX_LEN - 1) {
+    while (msg[i] != '\0' && i < (int)HTTP_CHAT_MSG_MAX_LEN - 1) {
         turn->user[i] = msg[i];
         i++;
     }
@@ -285,20 +284,30 @@ static int chat_history_add_user(chat_history_t *history, const char *msg)
     return 0;
 }
 
-static void chat_history_set_assistant(chat_history_t *history, const char *reply)
+void http_chat_history_set_assistant(http_chat_history_t *history, const char *reply)
 {
     if (history->count <= 0) {
         return;
     }
 
-    chat_turn_t *turn = &history->turns[history->count - 1];
+    http_chat_turn_t *turn = &history->turns[history->count - 1];
     int i = 0;
-    while (reply[i] != '\0' && i < (int)CHAT_MSG_MAX_LEN - 1) {
+    while (reply[i] != '\0' && i < (int)HTTP_CHAT_MSG_MAX_LEN - 1) {
         turn->assistant[i] = reply[i];
         i++;
     }
     turn->assistant[i] = '\0';
     turn->has_assistant = 1;
+}
+
+int http_chat_history_would_overflow(const http_chat_history_t *history, const char *new_user_msg)
+{
+    if (history->count >= (int)HTTP_CHAT_HISTORY_MAX_TURNS) {
+        return 1;
+    }
+
+    int projected = estimate_json_size(history) + 32 + str_len(new_user_msg);
+    return projected >= (int)CHAT_JSON_BUDGET;
 }
 
 static int json_append_escaped(char *buf, int cap, int *pos, const char *text)
@@ -321,7 +330,7 @@ static int json_append_escaped(char *buf, int cap, int *pos, const char *text)
     return 0;
 }
 
-static int estimate_json_size(const chat_history_t *history)
+static int estimate_json_size(const http_chat_history_t *history)
 {
     int size = 32 + str_len(AKOYA_CHAT_MODEL) + 24;
     for (int t = 0; t < history->count; t++) {
@@ -333,17 +342,12 @@ static int estimate_json_size(const chat_history_t *history)
     return size;
 }
 
-static int chat_history_would_overflow(const chat_history_t *history, const char *new_user_msg)
+static int chat_history_would_overflow(const http_chat_history_t *history, const char *new_user_msg)
 {
-    if (history->count >= (int)CHAT_HISTORY_MAX_TURNS) {
-        return 1;
-    }
-
-    int projected = estimate_json_size(history) + 32 + str_len(new_user_msg);
-    return projected >= (int)CHAT_JSON_BUDGET;
+    return http_chat_history_would_overflow(history, new_user_msg);
 }
 
-static int build_messages_json(const chat_history_t *history, char *json, int cap)
+static int build_messages_json(const http_chat_history_t *history, char *json, int cap)
 {
     int pos = 0;
     const char *prefix = "{\"model\":\"";
@@ -617,12 +621,28 @@ static const char *http_chat_fail_reason(http_chat_status_t status)
     if (status == HTTP_CHAT_FAIL_OVERFLOW) {
         return "overflow";
     }
+    if (status == HTTP_CHAT_FAIL_TRANSPORT_LIFECYCLE) {
+        return "transport-lifecycle";
+    }
     return "connect";
+}
+
+const char *http_chat_status_reason(http_chat_status_t status)
+{
+    return http_chat_fail_reason(status);
+}
+
+static http_chat_status_t http_chat_await_inactive_transport(void)
+{
+    if (!tcp_chat_drain_until_inactive(TCP_CLOSE_DRAIN_MS)) {
+        return HTTP_CHAT_FAIL_TRANSPORT_LIFECYCLE;
+    }
+    return HTTP_CHAT_OK;
 }
 
 static http_chat_status_t http_chat_turn_exchange(
     tcp_session_t *session,
-    chat_history_t *history,
+    http_chat_history_t *history,
     char *reply,
     int reply_cap)
 {
@@ -685,13 +705,11 @@ static http_chat_status_t http_chat_turn_exchange(
     return HTTP_CHAT_OK;
 }
 
-static http_chat_status_t http_chat_run_turn(chat_history_t *history, char *reply, int reply_cap)
+http_chat_status_t http_chat_run_turn(http_chat_history_t *history, char *reply, int reply_cap)
 {
-    if (!tcp_drain_until_inactive(TCP_CLOSE_DRAIN_MS)) {
-        tcp_transport_release();
-        if (!tcp_drain_until_inactive(TCP_CLOSE_DRAIN_MS)) {
-            return HTTP_CHAT_FAIL_CONNECT;
-        }
+    http_chat_status_t inactive = http_chat_await_inactive_transport();
+    if (inactive != HTTP_CHAT_OK) {
+        return inactive;
     }
 
     ipv4_addr_t host;
@@ -711,6 +729,10 @@ static http_chat_status_t http_chat_run_turn(chat_history_t *history, char *repl
 
     if (open_status != TCP_OK) {
         tcp_session_close(&session);
+        inactive = http_chat_await_inactive_transport();
+        if (inactive != HTTP_CHAT_OK) {
+            return inactive;
+        }
         if (open_status == TCP_FAIL_TIMEOUT) {
             return HTTP_CHAT_FAIL_TIMEOUT;
         }
@@ -721,11 +743,9 @@ static http_chat_status_t http_chat_run_turn(chat_history_t *history, char *repl
 
     tcp_session_close(&session);
 
-    if (!tcp_drain_until_inactive(TCP_CLOSE_DRAIN_MS)) {
-        tcp_transport_release();
-        if (!tcp_drain_until_inactive(TCP_CLOSE_DRAIN_MS)) {
-            return HTTP_CHAT_FAIL_CONNECT;
-        }
+    inactive = http_chat_await_inactive_transport();
+    if (inactive != HTTP_CHAT_OK) {
+        return inactive;
     }
 
     return status;
@@ -733,8 +753,8 @@ static http_chat_status_t http_chat_run_turn(chat_history_t *history, char *repl
 
 void http_chat_session(void)
 {
-    chat_history_t history;
-    chat_history_init(&history);
+    http_chat_history_t history;
+    http_chat_history_init(&history);
 
     ps2_keyboard_init();
 
@@ -759,14 +779,14 @@ void http_chat_session(void)
             continue;
         }
 
-        if (chat_history_add_user(&history, line) != 0) {
+        if (http_chat_history_add_user(&history, line) != 0) {
             emit_fail("overflow");
             continue;
         }
 
         http_chat_status_t status = http_chat_run_turn(&history, reply, (int)sizeof(reply));
         if (status == HTTP_CHAT_OK) {
-            chat_history_set_assistant(&history, reply);
+            http_chat_history_set_assistant(&history, reply);
             emit_ok(reply);
         } else {
             emit_fail(http_chat_fail_reason(status));

@@ -1,6 +1,7 @@
 #include "net/tcp/tcp.h"
 
 #include "net/ipv4/ipv4.h"
+#include "net/eth/eth.h"
 #include "net/link/link.h"
 #include "time/time.h"
 
@@ -175,13 +176,15 @@ static void tcp_ipv4_handler(const uint8_t *packet, uint16_t length, void *ctx)
     }
 
     if (payload_len > 0 && conn_established) {
-        if (seq == conn_ack && recv_buf != 0) {
-            uint16_t space = (recv_cap > recv_len) ? (uint16_t)(recv_cap - recv_len) : 0;
-            uint16_t copy = (payload_len < space) ? payload_len : space;
-            for (uint16_t i = 0; i < copy; i++) {
-                recv_buf[recv_len + i] = payload[i];
+        if (seq == conn_ack) {
+            if (recv_buf != 0) {
+                uint16_t space = (recv_cap > recv_len) ? (uint16_t)(recv_cap - recv_len) : 0;
+                uint16_t copy = (payload_len < space) ? payload_len : space;
+                for (uint16_t i = 0; i < copy; i++) {
+                    recv_buf[recv_len + i] = payload[i];
+                }
+                recv_len = (uint16_t)(recv_len + copy);
             }
-            recv_len = (uint16_t)(recv_len + copy);
             conn_ack = seq + payload_len;
             (void)tcp_send_segment(TCP_FLAG_ACK, 0, 0);
         }
@@ -280,6 +283,15 @@ static void tcp_end_recv(void)
     recv_cap = 0;
 }
 
+static void tcp_drain_link(void)
+{
+    eth_device_t *dev = link_device();
+    if (dev != 0) {
+        eth_drain_tx(dev);
+    }
+    link_drain_rx(0);
+}
+
 static void tcp_quiesce_connection(uint32_t deadline_ms)
 {
     if (!conn_established || conn_reset) {
@@ -304,7 +316,7 @@ static void tcp_quiesce_connection(uint32_t deadline_ms)
         }
     }
 
-    link_drain_rx(0);
+    tcp_drain_link();
 }
 
 int tcp_transport_inactive(void)
@@ -340,6 +352,20 @@ int tcp_drain_until_inactive(uint32_t timeout_ms)
     }
 
     return tcp_transport_inactive();
+}
+
+int tcp_chat_drain_until_inactive(uint32_t timeout_ms)
+{
+    uint32_t deadline = time_millis() + timeout_ms;
+
+    while (time_millis() < deadline) {
+        if (tcp_transport_inactive()) {
+            return 1;
+        }
+        link_poll();
+    }
+
+    return tcp_transport_inactive() ? 1 : 0;
 }
 
 static void tcp_begin_recv(uint8_t *buf, uint16_t cap, uint16_t *len_out)
@@ -522,12 +548,13 @@ void tcp_session_close(tcp_session_t *session)
         if (conn_established && !conn_reset && !(conn_our_fin_sent && conn_remote_fin)) {
             (void)tcp_send_segment(TCP_FLAG_RST | TCP_FLAG_ACK, 0, 0);
             conn_reset = 1;
-            link_drain_rx(0);
+            tcp_drain_link();
         }
     } else if (session == 0) {
         tcp_quiesce_connection(TCP_CLOSE_DRAIN_MS);
     }
 
+    tcp_drain_link();
     tcp_transport_release();
 
     if (session != 0) {

@@ -9,6 +9,7 @@ BUILD_DIR="${ROOT_DIR}/build"
 LOG_FILE="${BUILD_DIR}/build.log"
 KERNEL_BIN="${BUILD_DIR}/kernel.bin"
 TRANSPORT_BIN="${BUILD_DIR}/transport-test.bin"
+CHAT_REGRESSION_BIN="${BUILD_DIR}/chat-regression-test.bin"
 PROFILE_FILE="${ROOT_DIR}/target/akoya.profile"
 
 CC_PREFIX="${AKOYA_CROSS_PREFIX:-i686-elf-}"
@@ -34,6 +35,8 @@ CHAT_MODEL="${AKOYA_CHAT_MODEL:-fast-text-qwen3-8b}"
 CHAT_TIMEOUT_MS="${AKOYA_CHAT_TIMEOUT_MS:-60000}"
 CHAT_PORT="${AKOYA_CHAT_PORT:-11435}"
 CHAT_MAX_TOKENS="${AKOYA_CHAT_MAX_TOKENS:-500}"
+CHAT_REGRESSION_TURNS="${AKOYA_CHAT_REGRESSION_TURNS:-3}"
+CHAT_REGRESSION_GAP_MS="${AKOYA_CHAT_REGRESSION_GAP_MS:-5000}"
 
 log() {
     printf '%s\n' "$*" | tee -a "${LOG_FILE}"
@@ -42,8 +45,8 @@ log() {
 emit_result() {
     local status="$1"
     local message="$2"
-    printf 'AKOYA_BUILD_RESULT=status=%s;kernel=%s;transport=%s;log=%s;message=%s\n' \
-        "${status}" "${KERNEL_BIN}" "${TRANSPORT_BIN}" "${LOG_FILE}" "${message}"
+    printf 'AKOYA_BUILD_RESULT=status=%s;kernel=%s;transport=%s;chat_regression=%s;log=%s;message=%s\n' \
+        "${status}" "${KERNEL_BIN}" "${TRANSPORT_BIN}" "${CHAT_REGRESSION_BIN}" "${LOG_FILE}" "${message}"
 }
 
 resolve_build_id() {
@@ -185,6 +188,8 @@ main() {
         -DAKOYA_CHAT_TIMEOUT_MS="${CHAT_TIMEOUT_MS}"
         -DAKOYA_CHAT_PORT="${CHAT_PORT}"
         -DAKOYA_CHAT_MAX_TOKENS="${CHAT_MAX_TOKENS}"
+        -DAKOYA_CHAT_REGRESSION_TURNS="${CHAT_REGRESSION_TURNS}"
+        -DAKOYA_CHAT_REGRESSION_GAP_MS="${CHAT_REGRESSION_GAP_MS}U"
     )
 
     local shared_sources=(
@@ -214,9 +219,18 @@ main() {
         "${ROOT_DIR}/kernel/transport_main.c"
     )
 
+    local chat_regression_only_sources=(
+        "${ROOT_DIR}/kernel/net/chat_regression_main.c"
+        "${ROOT_DIR}/kernel/net/http/http_chat.c"
+        "${ROOT_DIR}/kernel/input/ps2_keyboard.c"
+        "${ROOT_DIR}/kernel/input/ps2_readline.c"
+        "${ROOT_DIR}/kernel/chat_regression_entry.c"
+    )
+
     local shared_objects=()
     local kernel_objects=()
     local transport_objects=()
+    local chat_regression_objects=()
     local source object base
 
     log "Compiling with ${CC} (memory limit ${MEM_LIMIT_MB} MB)"
@@ -244,11 +258,22 @@ main() {
         compile_source "${source}" "${object}"
     done
 
+    for source in "${chat_regression_only_sources[@]}"; do
+        base="$(basename "${source}")"
+        base="${base%.*}"
+        object="${BUILD_DIR}/chat-regression-${base}.o"
+        chat_regression_objects+=("${object}")
+        compile_source "${source}" "${object}"
+    done
+
     link_image "${BUILD_DIR}/kernel.elf" "${KERNEL_BIN}" \
         "${shared_objects[@]}" "${kernel_objects[@]}"
 
     link_image "${BUILD_DIR}/transport-test.elf" "${TRANSPORT_BIN}" \
         "${shared_objects[@]}" "${transport_objects[@]}"
+
+    link_image "${BUILD_DIR}/chat-regression-test.elf" "${CHAT_REGRESSION_BIN}" \
+        "${shared_objects[@]}" "${chat_regression_objects[@]}"
 
     emit_result "success" "build-complete"
 }

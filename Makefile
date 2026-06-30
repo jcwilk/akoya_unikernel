@@ -7,7 +7,7 @@ clean:
 	@rm -rf build
 
 test: build
-	@bash scripts/run-qemu.sh --headless --logical kernel
+	@bash scripts/run-chat-regression-test.sh
 
 run: build
 	@bash scripts/run-qemu.sh --headful

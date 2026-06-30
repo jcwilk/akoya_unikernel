@@ -46,4 +46,6 @@ void tcp_transport_release(void);
 
 int tcp_drain_until_inactive(uint32_t timeout_ms);
 
+int tcp_chat_drain_until_inactive(uint32_t timeout_ms);
+
 #endif

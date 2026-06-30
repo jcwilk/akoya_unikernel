@@ -44,7 +44,7 @@ Usage: $0 (--headful|--headless) [--image PATH | --logical NAME | --boot-iso PAT
   --headful     Interactive SDL display window
   --headless    No display; smoke-test timeout and bootstrap/network assertions
   --image PATH  Boot image to run (default: auto-select when exactly one logical image exists)
-  --logical NAME  Select logical image stem (e.g. kernel, transport-test)
+  --logical NAME  Select logical image stem (e.g. kernel, transport-test, chat-regression-test)
   --boot-iso PATH  Boot from BIOS/Legacy optical media (mutually exclusive with --image / --logical / --boot-disk)
   --boot-disk PATH Boot from raw MBR disk image as first hard disk (USB/HDD image from make usb)
   --script FILE Headless scripted chat interaction with output assertions (*.akoya-script)
@@ -411,7 +411,9 @@ if [[ -n "${BOOT_DISK_PATH}" ]]; then
 fi
 
 if [[ -z "${SCRIPT_FILE}" && "${MODE}" == "headless" && "${ISO_SMOKE}" -eq 0 && "${AKOYA_USE_KEYBOARD_SCRIPT:-0}" != "1" ]]; then
-    SCRIPT_FILE="${DEFAULT_CHAT_SCRIPT_FILE}"
+    if [[ -z "${LOGICAL_ID}" || "${LOGICAL_ID}" == "kernel" ]]; then
+        SCRIPT_FILE="${DEFAULT_CHAT_SCRIPT_FILE}"
+    fi
 fi
 
 if [[ -n "${SCRIPT_FILE}" && "${MODE}" != "headless" ]]; then
@@ -534,11 +536,17 @@ image_is_transport_test() {
     [[ "$(basename "${image_path}")" == transport-test.bin || "$(basename "${image_path}")" == transport-test.elf ]]
 }
 
+image_is_chat_regression_test() {
+    local image_path="$1"
+    [[ "$(basename "${image_path}")" == chat-regression-test.bin || "$(basename "${image_path}")" == chat-regression-test.elf ]]
+}
+
 main() {
     mkdir -p "${BUILD_DIR}"
 
     local kernel_image=""
     local transport_mode=0
+    local chat_regression_mode=0
     if [[ -n "${BOOT_ISO_PATH}" ]]; then
         kernel_image="${BOOT_ISO_PATH}"
     elif [[ -n "${BOOT_DISK_PATH}" ]]; then
@@ -547,6 +555,8 @@ main() {
         kernel_image="$(resolve_kernel_image)"
         if image_is_transport_test "${kernel_image}"; then
             transport_mode=1
+        elif image_is_chat_regression_test "${kernel_image}"; then
+            chat_regression_mode=1
         fi
     fi
 
@@ -569,6 +579,8 @@ main() {
             echo "Running QEMU headless disk smoke test (timeout ${TIMEOUT_SEC}s, boot disk: ${BOOT_DISK_PATH})" | tee -a "${LOG_FILE}"
         elif [[ "${ISO_SMOKE}" -eq 1 ]]; then
             echo "Running QEMU headless ISO smoke test (timeout ${TIMEOUT_SEC}s, boot ISO: ${BOOT_ISO_PATH})" | tee -a "${LOG_FILE}"
+        elif [[ "${chat_regression_mode}" -eq 1 ]]; then
+            echo "Running QEMU headless timed-gap chat regression (timeout ${TIMEOUT_SEC}s)" | tee -a "${LOG_FILE}"
         elif [[ -n "${SCRIPT_FILE}" ]]; then
             echo "Running QEMU headless scripted chat test (timeout ${TIMEOUT_SEC}s, script: ${SCRIPT_FILE})" | tee -a "${LOG_FILE}"
         else
@@ -614,7 +626,7 @@ main() {
     fi
 
     local inject_pid=""
-    if [[ "${MODE}" == "headless" && "${transport_mode}" -eq 0 && "${ISO_SMOKE}" -eq 0 ]]; then
+    if [[ "${MODE}" == "headless" && "${transport_mode}" -eq 0 && "${chat_regression_mode}" -eq 0 && "${ISO_SMOKE}" -eq 0 ]]; then
         rm -f "${MONITOR_SOCK}"
         qemu_args+=(-monitor "unix:${MONITOR_SOCK},server,nowait")
         if [[ -n "${SCRIPT_FILE}" ]]; then
@@ -677,6 +689,25 @@ main() {
             fail "transport-test aggregate failure reported in captured output"
         fi
         fail "transport-test aggregate result not found in captured output"
+    fi
+
+    if [[ "${chat_regression_mode}" -eq 1 ]]; then
+        if grep -Fq "timed-gap-chat-regression: ALL PASS" "${LOG_FILE}"; then
+            if grep -q '^chat failed:' "${LOG_FILE}"; then
+                fail "chat failed detected during timed-gap chat regression"
+            fi
+            local turn_pass_count
+            turn_pass_count="$(grep -c ': PASS$' "${LOG_FILE}" || true)"
+            if [[ "${turn_pass_count}" -lt 3 ]]; then
+                fail "expected at least 3 turn PASS lines in timed-gap chat regression, got ${turn_pass_count}"
+            fi
+            echo "QEMU timed-gap chat regression passed" | tee -a "${LOG_FILE}"
+            exit 0
+        fi
+        if grep -Fq "timed-gap-chat-regression: FAILED" "${LOG_FILE}"; then
+            fail "timed-gap chat regression aggregate failure reported in captured output"
+        fi
+        fail "timed-gap chat regression aggregate result not found in captured output"
     fi
 
     if [[ "${ISO_SMOKE}" -eq 1 ]]; then

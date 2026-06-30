@@ -51,8 +51,8 @@ Development workstation (Linux):
 ## Build and test
 
 ```bash
-make build    # cross-compile bootstrap kernel → build/kernel.elf, build/kernel.bin, build/transport-test.*
-make test     # build (if needed) + headless macvtap QEMU smoke test
+make build    # cross-compile bootstrap kernel → build/kernel.elf, build/kernel.bin, build/transport-test.*, build/chat-regression-test.*
+make test     # build (if needed) + headless timed-gap multi-turn chat regression (≥3 turns, guest-side idle gaps)
 make run      # build (if needed) + headful interactive macvtap QEMU session
 make iso          # BIOS/Legacy ISO → build/akoya-boot.iso (QEMU optical verify; not for USB dd on legacy BIOS)
 make verify-iso   # QEMU boot-from-ISO smoke
@@ -72,22 +72,27 @@ Automated verification **requires** the configured inference endpoint (`AKOYA_CH
 |-------------|---------|
 | `bash scripts/build-boot-iso.sh` / `make iso` | Package `build/akoya-boot.iso` (Multiboot1 + GRUB, BIOS/Legacy) |
 | `bash scripts/verify-boot-iso.sh` / `make verify-iso` | Boot packaged ISO under QEMU; pass on bootstrap + connectivity probe (no inference pre-flight) |
-| `bash scripts/run-transport-test.sh` | Build (if needed), run `transport-test` image headlessly, exit 0 on `transport-test: ALL PASS` |
+| `bash scripts/run-chat-regression-test.sh` | Build (if needed), run `chat-regression-test` image headlessly, exit 0 on `timed-gap-chat-regression: ALL PASS` (default `make test` gate) |
+| `bash scripts/run-transport-test.sh` | Build (if needed), run `transport-test` image headlessly, exit 0 on `transport-test: ALL PASS` (complementary; does not satisfy chat health gate) |
 | `bash scripts/run-qemu.sh --headless --logical kernel --script FILE` | Full-app scripted chat with output assertions (`*.akoya-script`) |
-| `bash scripts/run-qemu.sh --headless --logical kernel` | Default multi-turn scripted chat regression (`scripts/fixtures/multi-turn-pong.akoya-script`) |
+| `bash scripts/run-qemu.sh --headless --logical kernel` | Multi-turn scripted chat via keyboard (`scripts/fixtures/multi-turn-pong.akoya-script` when no `--script`) |
+| `bash scripts/run-qemu.sh --headless --logical chat-regression-test` | Timed-gap chat regression image (guest-side idle gaps at input prompt) |
 | `bash scripts/run-qemu.sh --headless --boot-iso build/akoya-boot.iso` | ISO boot smoke (bootstrap + connectivity probe only) |
 | `bash scripts/run-qemu.sh --headless --image build/transport-test.elf` | Explicit transport-test image selection when both images exist |
 
-`make verify-iso` and `run-qemu.sh --boot-iso` **do not** require the inference endpoint to be reachable from the workstation. `make test` and default headless kernel runs still require inference pre-flight.
+`make verify-iso` and `run-qemu.sh --boot-iso` **do not** require the inference endpoint to be reachable from the workstation. `make test`, timed-gap chat regression, and default headless kernel runs require inference pre-flight.
 
-When both `kernel.*` and `transport-test.*` exist under `build/`, omit `--image` / `--logical` and the runner errors with an actionable list—use `--logical kernel` or `--logical transport-test`.
+When multiple logical images exist under `build/`, omit `--image` / `--logical` and the runner errors with an actionable list—use `--logical kernel`, `--logical transport-test`, or `--logical chat-regression-test`.
 
 ### Transport-test image
 
-`scripts/build.sh` emits two logical boot images sharing the production network stack (`link`, IPv4, DHCP, TCP):
+`scripts/build.sh` emits three logical boot images sharing the production network stack (`link`, IPv4, DHCP, TCP):
 
 - `build/kernel.bin` / `build/kernel.elf` — interactive chat unikernel
+- `build/chat-regression-test.bin` / `build/chat-regression-test.elf` — timed-gap multi-turn chat regression (production chat turn path, guest-side idle gaps)
 - `build/transport-test.bin` / `build/transport-test.elf` — non-interactive transport scenario suite
+
+The timed-gap chat regression image prints `turn N: PASS`/`FAIL` lines and a final aggregate `timed-gap-chat-regression: ALL PASS` or `timed-gap-chat-regression: FAILED`. It exercises the same `http_chat_run_turn` path as the main unikernel with bounded timed waits at the `> ` prompt between scheduled turns (default 5 s, three turns). **Passing transport-test alone does not satisfy the default multi-turn chat health gate** — use `make test` or `scripts/run-chat-regression-test.sh`.
 
 The transport-test image prints per-scenario `PASS`/`FAIL` lines and a final aggregate `transport-test: ALL PASS` or `transport-test: FAILED`. The refused-connection scenario targets port **19999** on the configured chat host (synthetic closed port, not inference downtime).
 
@@ -138,14 +143,14 @@ After network diagnostics succeed, the kernel enters a REPL-style chat loop:
 - **Line editing:** Printable ASCII is echoed; Backspace removes the last character; Enter submits the line. Empty lines are ignored.
 - **Exit:** Type `quit` or `exit` (case-insensitive) to end the session without sending inference.
 - **History:** Up to 16 turns (~8 KB JSON budget) of user and assistant messages are retained in memory and included in each chat-completion request.
-- **Headless automation:** `make test` runs the default multi-turn scripted regression (`scripts/fixtures/multi-turn-pong.akoya-script`): two inference turns with per-turn reply assertions and rejection of connection-failure lines between turns. Set `AKOYA_USE_KEYBOARD_SCRIPT=1` to restore legacy QEMU `sendkey` injection via `AKOYA_CHAT_SCRIPT` instead.
+- **Headless automation:** `make test` runs timed-gap chat regression (`chat-regression-test` image): at least three consecutive inference turns with guest-side idle gaps at the input prompt, per-turn pass/fail reporting, and rejection of `chat failed:` lines between successful turns. Transport-only verification (`scripts/run-transport-test.sh`) is complementary and does not substitute for this gate. For host-side keyboard scripting on the main kernel image, use `run-qemu.sh --headless --logical kernel --script` or set `AKOYA_USE_KEYBOARD_SCRIPT=1`.
 
 Headless `make test` asserts:
 
 - Bootstrap message (`akoya_unikernel bootstrap ok`)
 - `net_ip=<dotted-quad>` with a leased IPv4 address
-- `net_ping=<label> status=ok rtt_ms=<n>` (ICMP to the build-time probe target must succeed)
-- Plain assistant reply text for at least two scripted chat turns when the host can reach `192.168.1.110:11435` at test time (pre-flight check in `run-qemu.sh`)
+- Reachability line for the configured chat host
+- `turn N: PASS` for at least three scheduled turns and `timed-gap-chat-regression: ALL PASS`
 - No `chat failed:` lines between successful multi-turn exchanges
 
 **llama.cpp prerequisite:** For full chat-completion acceptance, run a llama.cpp OpenAI-compatible server on the workstation LAN at `http://192.168.1.110:11435/v1/chat/completions`. Headless verification aborts before emulation when the endpoint is unreachable from the workstation.
