@@ -1,0 +1,11 @@
+# iw dev 2>&1
+
+ 
+phy#2
+	Interface wlp1s1
+		ifindex 3
+		wdev 0x200000001
+		addr 00:0e:35:ae:a2:be
+		type managed
+
+# exit_code=0

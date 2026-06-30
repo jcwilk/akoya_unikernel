@@ -1,0 +1,10 @@
+# sensors 2>&1
+
+ 
+BAT0-acpi-0
+Adapter: ACPI interface
+in0:           0.00 V  
+curr1:         0.00 A  
+
+
+# exit_code=0

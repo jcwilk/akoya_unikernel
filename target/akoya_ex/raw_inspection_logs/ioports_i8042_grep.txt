@@ -1,0 +1,8 @@
+# grep -E '0060|0064|0061' /proc/ioports 2>/dev/null || cat /proc/ioports
+
+ 
+  0060-0060 : keyboard
+  0061-0061 : PNP0800:00
+  0064-0064 : keyboard
+
+# exit_code=0

@@ -1,0 +1,53 @@
+# cat /proc/iomem
+
+ 
+00000000-00000fff : Reserved
+00001000-0009fbff : System RAM
+0009fc00-0009ffff : Reserved
+000a0000-000bffff : PCI Bus 0000:00
+  000a0000-000bffff : Video RAM area
+000c0000-000cffff : PCI Bus 0000:00
+  000c0000-000c7fff : Video ROM
+000d0000-000dffff : PCI Bus 0000:00
+000e0000-000fffff : Reserved
+  000f0000-000fffff : System ROM
+00100000-7dfeffff : System RAM
+  0c000000-0ce7376a : Kernel code
+  0ce74000-0d2e8fff : Kernel rodata
+  0d2ea000-0d4b6bbf : Kernel data
+  0d60a000-0d683fff : Kernel bss
+7dff0000-7dffffbf : ACPI Tables
+7dffffc0-7dffffff : ACPI Non-volatile Storage
+7e000000-febfffff : PCI Bus 0000:00
+  7e000000-7fffffff : Reserved
+    7e000000-7ffe0000 : Graphics Stolen Memory
+  80000000-87ffffff : 0000:00:02.1
+  88000000-8807ffff : 0000:00:02.1
+  88080000-880803ff : 0000:00:1f.1
+  88084000-88087fff : i915 MCHBAR
+  a0000000-afffffff : PCI Bus 0000:01
+    a0000000-a3ffffff : PCI CardBus 0000:02
+  b0000000-b7ffffff : 0000:00:02.0
+  e0000000-efffffff : PCI Bus 0000:01
+    e0000000-e00007ff : 0000:01:05.0
+      e0000000-e00007ff : firewire_ohci
+    e0000800-e00008ff : 0000:01:02.0
+      e0000800-e00008ff : 8139too
+    e0001000-e0001fff : 0000:01:01.0
+    e4000000-e4000fff : 0000:01:04.0
+      e4000000-e4000fff : yenta_socket
+    e8000000-ebffffff : PCI CardBus 0000:02
+  f0000000-f007ffff : 0000:00:02.0
+  f0080400-f00805ff : 0000:00:1f.5
+    f0080400-f00805ff : Intel 82801DB-ICH4
+  f0080600-f00806ff : 0000:00:1f.5
+    f0080600-f00806ff : Intel 82801DB-ICH4
+  febff000-febff3ff : 0000:00:1d.7
+    febff000-febff3ff : ehci_hcd
+ffb00000-ffb7ffff : INT0800:00
+ffb80000-ffbfffff : Reserved
+  ffb80000-ffbfffff : INT0800:00
+    ffb80000-ffbfffff : PCI Bus 0000:00
+fff80000-ffffffff : Reserved
+  fff80000-ffffffff : PCI Bus 0000:00
+    fff80000-ffffffff : pnp 00:03

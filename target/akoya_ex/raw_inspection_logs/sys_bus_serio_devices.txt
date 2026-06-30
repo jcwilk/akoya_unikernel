@@ -1,0 +1,84 @@
+# for d in /sys/bus/serio/devices/*; do echo "=== $d ==="; for f in "$d"/*; do [ -f "$f" ] && echo "$(basename $f)=$(cat $f 2>/dev/null)"; done; echo; done
+
+ 
+=== /sys/bus/serio/devices/serio0 ===
+bind_mode=auto
+description=i8042 KBD port
+drvctl=
+err_count=0
+extra=0
+firmware_id=PNP: PNP0303
+force_release=369-370
+modalias=serio:ty06pr00id00ex00
+scroll=0
+set=2
+softraw=1
+softrepeat=0
+uevent=DRIVER=atkbd
+SERIO_TYPE=06
+SERIO_PROTO=00
+SERIO_ID=00
+SERIO_EXTRA=00
+MODALIAS=serio:ty06pr00id00ex00
+SERIO_FIRMWARE_ID=PNP: PNP0303
+
+=== /sys/bus/serio/devices/serio1 ===
+bind_mode=auto
+description=i8042 AUX0 port
+drvctl=
+firmware_id=PNP: SYN0c07 SYN0c00 PNP0f13
+modalias=serio:ty01pr00id00ex00
+uevent=SERIO_TYPE=01
+SERIO_PROTO=00
+SERIO_ID=00
+SERIO_EXTRA=00
+MODALIAS=serio:ty01pr00id00ex00
+SERIO_FIRMWARE_ID=PNP: SYN0c07 SYN0c00 PNP0f13
+
+=== /sys/bus/serio/devices/serio2 ===
+bind_mode=auto
+description=i8042 AUX1 port
+drvctl=
+firmware_id=PNP: SYN0c07 SYN0c00 PNP0f13
+modalias=serio:ty01pr00id00ex00
+uevent=SERIO_TYPE=01
+SERIO_PROTO=00
+SERIO_ID=00
+SERIO_EXTRA=00
+MODALIAS=serio:ty01pr00id00ex00
+SERIO_FIRMWARE_ID=PNP: SYN0c07 SYN0c00 PNP0f13
+
+=== /sys/bus/serio/devices/serio3 ===
+bind_mode=auto
+description=i8042 AUX2 port
+drvctl=
+firmware_id=PNP: SYN0c07 SYN0c00 PNP0f13
+modalias=serio:ty01pr00id00ex00
+protocol=SynPS/2
+rate=80
+resetafter=5
+resolution=200
+resync_time=0
+uevent=DRIVER=psmouse
+SERIO_TYPE=01
+SERIO_PROTO=00
+SERIO_ID=00
+SERIO_EXTRA=00
+MODALIAS=serio:ty01pr00id00ex00
+SERIO_FIRMWARE_ID=PNP: SYN0c07 SYN0c00 PNP0f13
+
+=== /sys/bus/serio/devices/serio4 ===
+bind_mode=auto
+description=i8042 AUX3 port
+drvctl=
+firmware_id=PNP: SYN0c07 SYN0c00 PNP0f13
+modalias=serio:ty01pr00id00ex00
+uevent=SERIO_TYPE=01
+SERIO_PROTO=00
+SERIO_ID=00
+SERIO_EXTRA=00
+MODALIAS=serio:ty01pr00id00ex00
+SERIO_FIRMWARE_ID=PNP: SYN0c07 SYN0c00 PNP0f13
+
+
+# exit_code=0

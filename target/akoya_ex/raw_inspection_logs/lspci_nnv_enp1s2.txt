@@ -1,0 +1,10 @@
+# lspci -nnv -s 01:02.0
+
+01:02.0 Ethernet controller [0200]: Realtek Semiconductor Co., Ltd. RTL-8100/8101L/8139 PCI Fast Ethernet Adapter [10ec:8139] (rev 10)
+	Subsystem: Mitac Device [1071:8011]
+	Flags: bus master, medium devsel, latency 64, IRQ 11
+	I/O ports at c100 [size=256]
+	Memory at e0000800 (32-bit, non-prefetchable) [size=256]
+	Capabilities: [50] Power Management version 2
+	Kernel driver in use: 8139too
+	Kernel modules: 8139cp, 8139too

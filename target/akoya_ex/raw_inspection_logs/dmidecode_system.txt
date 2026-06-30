@@ -1,0 +1,28 @@
+# dmidecode -t system
+
+ 
+# dmidecode 3.7
+Getting SMBIOS data from sysfs.
+SMBIOS 2.3 present.
+
+Handle 0x0001, DMI type 1, 25 bytes
+System Information
+	Manufacturer: Notebook
+	Product Name: MIM2060
+	Version: FAB-2
+	Serial Number: 12345678
+	UUID: 00000000-0000-0000-0000-0040d06f2c74
+	Wake-up Type: Power Switch
+
+Handle 0x0013, DMI type 12, 5 bytes
+System Configuration Options
+	Option 1: Insyde Software SM-BIOS For Whitney
+
+Handle 0x0020, DMI type 23, 13 bytes
+System Reset
+	Status: Disabled
+	Watchdog Timer: Not Present
+
+Handle 0x0028, DMI type 32, 11 bytes
+System Boot Information
+	Status: No errors detected

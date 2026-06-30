@@ -1,0 +1,14 @@
+# lspci -nnv -s 01:05.0
+
+ 
+01:05.0 FireWire (IEEE 1394) [0c00]: VIA Technologies, Inc. VT6306/7/8 [Fire II(M)] IEEE 1394 OHCI Controller [1106:3044] (rev 80) (prog-if 10 [OHCI])
+	Subsystem: Mitac Device [1071:8011]
+	Flags: bus master, stepping, medium devsel, latency 64, IRQ 11
+	Memory at e0000000 (32-bit, non-prefetchable) [size=2K]
+	I/O ports at c000 [size=128]
+	Capabilities: [50] Power Management version 2
+	Kernel driver in use: firewire_ohci
+	Kernel modules: firewire_ohci
+
+
+# exit_code=0

@@ -1,0 +1,7 @@
+# dmesg 2>/dev/null | grep -iE 'snd|ac97|intel8x0|audio|sound' || true
+
+ 
+[   45.827005] snd_intel8x0 0000:00:1f.5: intel8x0_measure_ac97_clock: measured 61195 usecs (2948 samples)
+[   45.827023] snd_intel8x0 0000:00:1f.5: clocking to 48000
+
+# exit_code=0

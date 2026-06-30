@@ -1,0 +1,7 @@
+# ls -la /lib/firmware/ipw* /lib/firmware/intel/ipw* 2>&1; find /lib/firmware -name 'ipw2200*' 2>/dev/null
+
+ 
+ls: cannot access '/lib/firmware/ipw*': No such file or directory
+ls: cannot access '/lib/firmware/intel/ipw*': No such file or directory
+
+# exit_code=0

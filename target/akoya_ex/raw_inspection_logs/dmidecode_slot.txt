@@ -1,0 +1,32 @@
+# dmidecode -t slot 2>&1
+
+ 
+# dmidecode 3.7
+Getting SMBIOS data from sysfs.
+SMBIOS 2.3 present.
+
+Handle 0x000F, DMI type 9, 13 bytes
+System Slot Information
+	Designation: ISA Slot
+	Type: ISA
+	Data Bus Width: 16 bit
+	Current Usage: Available
+	Length: Long
+	Characteristics:
+		Opening is shared
+		PME signal is supported
+
+Handle 0x0010, DMI type 9, 13 bytes
+System Slot Information
+	Designation: PCI Slot
+	Type: PCI
+	Data Bus Width: 32 bit
+	Current Usage: Available
+	Length: Long
+	ID: 4
+	Characteristics:
+		Opening is shared
+		PME signal is supported
+
+
+# exit_code=0

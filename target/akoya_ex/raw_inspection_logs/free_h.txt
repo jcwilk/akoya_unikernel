@@ -1,0 +1,8 @@
+# free -h
+
+ 
+               total        used        free      shared  buff/cache   available
+Mem:           1.9Gi       883Mi       1.0Gi       553Mi       824Mi       1.1Gi
+Swap:          1.9Gi          0B       1.9Gi
+
+# exit_code=0

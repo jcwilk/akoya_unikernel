@@ -1,0 +1,6 @@
+# uptime
+
+ 
+ 17:35:39 up  1:15,  0 users,  load average: 0.14, 0.07, 0.06
+
+# exit_code=0

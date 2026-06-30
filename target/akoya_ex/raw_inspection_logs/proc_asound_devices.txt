@@ -1,0 +1,17 @@
+# cat /proc/asound/devices 2>&1
+
+ 
+  1:        : sequencer
+  2: [ 1- 0]: digital audio playback
+  3: [ 1- 0]: digital audio capture
+  4: [ 1]   : control
+  5: [ 0- 0]: digital audio playback
+  6: [ 0- 0]: digital audio capture
+  7: [ 0- 1]: digital audio capture
+  8: [ 0- 2]: digital audio capture
+  9: [ 0- 3]: digital audio capture
+ 10: [ 0- 4]: digital audio playback
+ 11: [ 0]   : control
+ 33:        : timer
+
+# exit_code=0

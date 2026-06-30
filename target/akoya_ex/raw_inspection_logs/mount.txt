@@ -1,0 +1,17 @@
+# mount
+
+ 
+tmpfs on /initrd/mnt/tmpfs type tmpfs (rw,relatime,size=1528780k)
+/dev/loop0 on /initrd/pup_ro2 type squashfs (ro,noatime,errors=continue)
+unionfs on / type aufs (rw,relatime,si=4b568597)
+/dev/loop1 on /initrd/pup_f type squashfs (ro,noatime,errors=continue)
+/dev/loop2 on /initrd/pup_z type squashfs (ro,noatime,errors=continue)
+/dev/loop3 on /initrd/pup_a type squashfs (ro,noatime,errors=continue)
+devtmpfs on /dev type devtmpfs (rw,relatime,size=1008192k,nr_inodes=213295,mode=755)
+none on /proc type proc (rw,relatime)
+none on /dev/pts type devpts (rw,relatime,gid=2,mode=620,ptmxmode=000)
+none on /sys type sysfs (rw,relatime)
+cgroup2 on /sys/fs/cgroup type cgroup2 (rw,relatime,nsdelegate,memory_recursiveprot)
+shmfs on /dev/shm type tmpfs (rw,relatime,size=362012k)
+
+# exit_code=0

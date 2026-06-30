@@ -1,0 +1,34 @@
+# dmidecode -t baseboard 2>&1
+
+ 
+# dmidecode 3.7
+Getting SMBIOS data from sysfs.
+SMBIOS 2.3 present.
+
+Handle 0x0002, DMI type 2, 8 bytes
+Base Board Information
+	Manufacturer: Notebook
+	Product Name: Montara-GML
+	Version: FAB-2
+	Serial Number: 12345678
+
+Handle 0x0011, DMI type 10, 12 bytes
+On Board Device 1 Information
+	Type: Other
+	Status: Disabled
+	Description: IrDA Port
+On Board Device 2 Information
+	Type: Other
+	Status: Disabled
+	Description: CardBus Bridge
+On Board Device 3 Information
+	Type: Other
+	Status: Disabled
+	Description: IDE Controller
+On Board Device 4 Information
+	Type: Video
+	Status: Enabled
+	Description: VGA
+
+
+# exit_code=0

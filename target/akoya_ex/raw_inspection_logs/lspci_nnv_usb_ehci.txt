@@ -1,0 +1,13 @@
+# lspci -nnv -s 00:1d.7
+
+ 
+00:1d.7 USB controller [0c03]: Intel Corporation 82801DB/DBM (ICH4/ICH4-M) USB2 EHCI Controller [8086:24cd] (rev 03) (prog-if 20 [EHCI])
+	Subsystem: Mitac Device [1071:8011]
+	Flags: bus master, medium devsel, latency 0, IRQ 7
+	Memory at febff000 (32-bit, non-prefetchable) [size=1K]
+	Capabilities: [50] Power Management version 2
+	Capabilities: [58] Debug port: BAR=1 offset=0080
+	Kernel driver in use: ehci-pci
+
+
+# exit_code=0

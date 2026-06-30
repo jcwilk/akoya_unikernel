@@ -1,0 +1,11 @@
+# cat /proc/asound/pcm 2>&1
+
+ 
+00-00: Intel ICH : Intel 82801DB-ICH4 : playback 1 : capture 1
+00-01: Intel ICH - MIC ADC : Intel 82801DB-ICH4 - MIC ADC : capture 1
+00-02: Intel ICH - MIC2 ADC : Intel 82801DB-ICH4 - MIC2 ADC : capture 1
+00-03: Intel ICH - ADC2 : Intel 82801DB-ICH4 - ADC2 : capture 1
+00-04: Intel ICH - IEC958 : Intel 82801DB-ICH4 - IEC958 : playback 1
+01-00: Intel ICH - Modem : Intel 82801DB-ICH4 Modem - Modem : playback 1 : capture 1
+
+# exit_code=0

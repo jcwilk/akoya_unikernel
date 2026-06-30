@@ -1,0 +1,11 @@
+# dmesg 2>/dev/null | grep -iE 'wireless|wlan|radio|rfkill|acpi.*button|hotkey|fn' | head -40 || true
+
+ 
+[    0.004034] last_pfn = 0x7dff0 max_arch_pfn = 0x1000000
+[   37.895811] ACPI: button: Sleep Button [SBTN]
+[   37.896102] ACPI: button: Lid Switch [LID]
+[   37.896381] ACPI: button: Power Button [PWRF]
+[   44.476907] ipw2200: Intel(R) PRO/Wireless 2200/2915 Network Driver, 1.2.2kmprq
+[   44.477237] ipw2200: Detected Intel PRO/Wireless 2200BG Network Connection
+
+# exit_code=0

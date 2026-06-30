@@ -1,0 +1,19 @@
+# iwconfig 2>&1
+
+ 
+lo        no wireless extensions.
+
+enp1s2    no wireless extensions.
+
+wlp1s1    IEEE 802.11  ESSID:off/any  
+          Mode:Managed  Channel:0  Access Point: Not-Associated   
+          Bit Rate:0 kb/s   Tx-Power=20 dBm   Sensitivity=8/0  
+          Retry limit:7   RTS thr:off   Fragment thr:off
+          Encryption key:off
+          Power Management:off
+          Link Quality:0  Signal level:0  Noise level:0
+          Rx invalid nwid:0  Rx invalid crypt:0  Rx invalid frag:0
+          Tx excessive retries:0  Invalid misc:0   Missed beacon:0
+
+
+# exit_code=0

@@ -1,0 +1,4 @@
+# uname -a
+
+ 
+Linux puppypc3464 6.6.141 #1 SMP PREEMPT_DYNAMIC Mon Jun  1 05:51:25 UTC 2026 i686 GNU/Linux

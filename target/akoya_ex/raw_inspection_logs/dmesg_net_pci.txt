@@ -1,0 +1,216 @@
+# dmesg | grep -iE '8139|rtl|eth|pci|irq'
+
+ 
+[    0.057297] [mem 0x80000000-0xffb7ffff] available for PCI devices
+[    0.413816] NR_IRQS: 2304, nr_irqs: 32, preallocated irqs: 16
+[    0.475603] acpiphp: ACPI Hot Plug PCI Controller Driver version: 0.5
+[    0.475946] PCI: PCI BIOS revision 2.10 entry at 0xe97b4, last bus=1
+[    0.475952] PCI: Using configuration type 1 for base access
+[    0.991595] ACPI: \_SB_.PCI0.LPCB.EC0_: Boot DSDT EC used to handle transactions
+[    0.991680] PCI: Using host bridge windows from ACPI; if necessary, use "pci=nocrs" and report a bug
+[    0.991684] PCI: Using E820 reservations for host bridge windows
+[    1.004405] ACPI: \_SB_.PCI0.LPCB.FIR_.PUT2: New power resource
+[    1.009926] ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-ff])
+[    1.010556] PCI host bridge to bus 0000:00
+[    1.010561] pci_bus 0000:00: root bus resource [io  0x0000-0x0cf7 window]
+[    1.010567] pci_bus 0000:00: root bus resource [io  0x0d00-0xffff window]
+[    1.010571] pci_bus 0000:00: root bus resource [mem 0x000a0000-0x000bffff window]
+[    1.010576] pci_bus 0000:00: root bus resource [mem 0x000d0000-0x000dffff window]
+[    1.010581] pci_bus 0000:00: root bus resource [mem 0x000c0000-0x000cffff window]
+[    1.010585] pci_bus 0000:00: root bus resource [mem 0xffb80000-0xffbfffff]
+[    1.010590] pci_bus 0000:00: root bus resource [mem 0xfff80000-0xffffffff]
+[    1.010595] pci_bus 0000:00: root bus resource [mem 0x7e000000-0xfebfffff window]
+[    1.010600] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    1.010631] pci 0000:00:00.0: [8086:3580] type 00 class 0x060000
+[    1.010799] pci 0000:00:00.1: [8086:3584] type 00 class 0x088000
+[    1.010948] pci 0000:00:00.3: [8086:3585] type 00 class 0x088000
+[    1.011093] pci 0000:00:02.0: [8086:3582] type 00 class 0x030000
+[    1.011107] pci 0000:00:02.0: BAR 0 [mem 0xb0000000-0xb7ffffff pref]
+[    1.011117] pci 0000:00:02.0: BAR 1 [mem 0xf0000000-0xf007ffff]
+[    1.011125] pci 0000:00:02.0: BAR 2 [io  0xe000-0xe007]
+[    1.011157] pci 0000:00:02.0: Video device with shadowed ROM at [mem 0x000c0000-0x000dffff]
+[    1.011174] pci 0000:00:02.0: supports D1
+[    1.011386] pci 0000:00:02.1: [8086:3582] type 00 class 0x038000
+[    1.011398] pci 0000:00:02.1: BAR 0 [mem 0x00000000-0x07ffffff pref]
+[    1.011406] pci 0000:00:02.1: BAR 1 [mem 0x00000000-0x0007ffff]
+[    1.011444] pci 0000:00:02.1: supports D1
+[    1.011594] pci 0000:00:1d.0: [8086:24c2] type 00 class 0x0c0300
+[    1.011642] pci 0000:00:1d.0: BAR 4 [io  0x1200-0x121f]
+[    1.011861] pci 0000:00:1d.1: [8086:24c4] type 00 class 0x0c0300
+[    1.011909] pci 0000:00:1d.1: BAR 4 [io  0x1600-0x161f]
+[    1.012126] pci 0000:00:1d.2: [8086:24c7] type 00 class 0x0c0300
+[    1.012174] pci 0000:00:1d.2: BAR 4 [io  0x1700-0x171f]
+[    1.012451] pci 0000:00:1d.7: [8086:24cd] type 00 class 0x0c0320
+[    1.012473] pci 0000:00:1d.7: BAR 0 [mem 0xfebff000-0xfebff3ff]
+[    1.012565] pci 0000:00:1d.7: PME# supported from D0 D3hot D3cold
+[    1.012781] pci 0000:00:1e.0: [8086:2448] type 01 class 0x060400
+[    1.012814] pci 0000:00:1e.0: PCI bridge to [bus 01]
+[    1.012822] pci 0000:00:1e.0:   bridge window [io  0xc000-0xdfff]
+[    1.012829] pci 0000:00:1e.0:   bridge window [mem 0xe0000000-0xefffffff]
+[    1.012836] pci 0000:00:1e.0:   bridge window [mem 0xa0000000-0xafffffff pref]
+[    1.013051] pci 0000:00:1f.0: [8086:24cc] type 00 class 0x060100
+[    1.013123] pci 0000:00:1f.0: quirk: [io  0x1000-0x107f] claimed by ICH4 ACPI/GPIO/TCO
+[    1.013131] pci 0000:00:1f.0: quirk: [io  0x1300-0x133f] claimed by ICH4 GPIO
+[    1.013460] pci 0000:00:1f.1: [8086:24ca] type 00 class 0x01018a
+[    1.013479] pci 0000:00:1f.1: BAR 0 [io  0x0000-0x0007]
+[    1.013491] pci 0000:00:1f.1: BAR 1 [io  0x0000-0x0003]
+[    1.013502] pci 0000:00:1f.1: BAR 2 [io  0x0000-0x0007]
+[    1.013513] pci 0000:00:1f.1: BAR 3 [io  0x0000-0x0003]
+[    1.013524] pci 0000:00:1f.1: BAR 4 [io  0x1100-0x110f]
+[    1.013536] pci 0000:00:1f.1: BAR 5 [mem 0x00000000-0x000003ff]
+[    1.013550] pci 0000:00:1f.1: BAR 0 [io  0x01f0-0x01f7]: legacy IDE quirk
+[    1.013555] pci 0000:00:1f.1: BAR 1 [io  0x03f6]: legacy IDE quirk
+[    1.013559] pci 0000:00:1f.1: BAR 2 [io  0x0170-0x0177]: legacy IDE quirk
+[    1.013563] pci 0000:00:1f.1: BAR 3 [io  0x0376]: legacy IDE quirk
+[    1.013763] pci 0000:00:1f.3: [8086:24c3] type 00 class 0x0c0500
+[    1.013820] pci 0000:00:1f.3: BAR 4 [io  0x1400-0x141f]
+[    1.014027] pci 0000:00:1f.5: [8086:24c5] type 00 class 0x040100
+[    1.014045] pci 0000:00:1f.5: BAR 0 [io  0xe100-0xe1ff]
+[    1.014056] pci 0000:00:1f.5: BAR 1 [io  0xe200-0xe23f]
+[    1.014067] pci 0000:00:1f.5: BAR 2 [mem 0xf0080400-0xf00805ff]
+[    1.014078] pci 0000:00:1f.5: BAR 3 [mem 0xf0080600-0xf00806ff]
+[    1.014127] pci 0000:00:1f.5: PME# supported from D0 D3hot D3cold
+[    1.014353] pci 0000:00:1f.6: [8086:24c6] type 00 class 0x070300
+[    1.014371] pci 0000:00:1f.6: BAR 0 [io  0xe300-0xe3ff]
+[    1.014382] pci 0000:00:1f.6: BAR 1 [io  0xe400-0xe47f]
+[    1.014444] pci 0000:00:1f.6: PME# supported from D0 D3hot D3cold
+[    1.014638] pci_bus 0000:01: extended config space not accessible
+[    1.014760] pci 0000:01:01.0: [8086:4220] type 00 class 0x028000
+[    1.014779] pci 0000:01:01.0: BAR 0 [mem 0xe0001000-0xe0001fff]
+[    1.014855] pci 0000:01:01.0: PME# supported from D0 D3hot D3cold
+[    1.015011] pci 0000:01:02.0: [10ec:8139] type 00 class 0x020000
+[    1.015030] pci 0000:01:02.0: BAR 0 [io  0xc100-0xc1ff]
+[    1.015041] pci 0000:01:02.0: BAR 1 [mem 0xe0000800-0xe00008ff]
+[    1.015109] pci 0000:01:02.0: supports D1 D2
+[    1.015113] pci 0000:01:02.0: PME# supported from D1 D2 D3hot D3cold
+[    1.015322] pci 0000:01:04.0: [104c:ac50] type 02 class 0x060700
+[    1.015342] pci 0000:01:04.0: BAR 1 [mem 0x00000000-0x00000fff]
+[    1.015378] pci 0000:01:04.0: supports D1 D2
+[    1.015381] pci 0000:01:04.0: PME# supported from D0 D1 D2 D3hot D3cold
+[    1.015609] pci 0000:01:05.0: [1106:3044] type 00 class 0x0c0010
+[    1.015628] pci 0000:01:05.0: BAR 0 [mem 0xe0000000-0xe00007ff]
+[    1.015640] pci 0000:01:05.0: BAR 1 [io  0xc000-0xc07f]
+[    1.015709] pci 0000:01:05.0: supports D2
+[    1.015713] pci 0000:01:05.0: PME# supported from D2 D3hot D3cold
+[    1.015925] pci 0000:00:1e.0: PCI bridge to [bus 01] (subtractive decode)
+[    1.015937] pci 0000:00:1e.0:   bridge window [io  0x0000-0x0cf7 window] (subtractive decode)
+[    1.015942] pci 0000:00:1e.0:   bridge window [io  0x0d00-0xffff window] (subtractive decode)
+[    1.015947] pci 0000:00:1e.0:   bridge window [mem 0x000a0000-0x000bffff window] (subtractive decode)
+[    1.015951] pci 0000:00:1e.0:   bridge window [mem 0x000d0000-0x000dffff window] (subtractive decode)
+[    1.015956] pci 0000:00:1e.0:   bridge window [mem 0x000c0000-0x000cffff window] (subtractive decode)
+[    1.015961] pci 0000:00:1e.0:   bridge window [mem 0xffb80000-0xffbfffff] (subtractive decode)
+[    1.015965] pci 0000:00:1e.0:   bridge window [mem 0xfff80000-0xffffffff] (subtractive decode)
+[    1.015970] pci 0000:00:1e.0:   bridge window [mem 0x7e000000-0xfebfffff window] (subtractive decode)
+[    1.015976] pci 0000:01:04.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+[    1.016001] pci_bus 0000:02: extended config space not accessible
+[    1.016070] pci_bus 0000:02: busn_res: can not insert [bus 02-01] under [bus 01] (conflicts with (null) [bus 01])
+[    1.016080] pci_bus 0000:02: busn_res: [bus 02-01] end is updated to 05
+[    1.016085] pci_bus 0000:02: busn_res: can not insert [bus 02-05] under [bus 01] (conflicts with (null) [bus 01])
+[    1.016092] pci 0000:01:04.0: devices behind bridge are unusable because [bus 02-05] cannot be assigned for them
+[    1.016098] pci 0000:00:1e.0: bridge has subordinate 01 but max busn 05
+[    1.016108] pci_bus 0000:00: on NUMA node 0
+[    1.016501] ACPI: PCI: Interrupt link LNKA configured for IRQ 10
+[    1.016626] ACPI: PCI: Interrupt link LNKB configured for IRQ 5
+[    1.016745] ACPI: PCI: Interrupt link LNKC configured for IRQ 11
+[    1.016864] ACPI: PCI: Interrupt link LNKD configured for IRQ 11
+[    1.016974] ACPI: PCI: Interrupt link LNKE configured for IRQ 11
+[    1.017073] ACPI: PCI: Interrupt link LNKF configured for IRQ 0
+[    1.017077] ACPI: PCI: Interrupt link LNKF disabled
+[    1.017180] ACPI: PCI: Interrupt link LNKG configured for IRQ 11
+[    1.017284] ACPI: PCI: Interrupt link LNKH configured for IRQ 7
+[    1.018736] ACPI: \_SB_.PCI0.LPCB.EC0_: Boot DSDT EC initialization complete
+[    1.018741] ACPI: \_SB_.PCI0.LPCB.EC0_: EC: Used to handle transactions and events
+[    1.020701] PCI: Using ACPI for IRQ routing
+[    1.020704] PCI: pci_cache_line_size set to 64 bytes
+[    1.020882] pci 0000:00:02.0: vgaarb: setting as boot VGA device
+[    1.020887] pci 0000:00:02.0: vgaarb: bridge control possible
+[    1.020891] pci 0000:00:02.0: vgaarb: VGA device added: decodes=io+mem,owns=io+mem,locks=none
+[    1.073542] pci 0000:00:02.1: BAR 0 [mem 0x80000000-0x87ffffff pref]: assigned
+[    1.073559] pci 0000:00:02.1: BAR 1 [mem 0x88000000-0x8807ffff]: assigned
+[    1.073573] pci 0000:00:1f.1: BAR 5 [mem 0x88080000-0x880803ff]: assigned
+[    1.073590] pci 0000:01:04.0: BAR 1 [mem 0xe4000000-0xe4000fff]: assigned
+[    1.073597] pci 0000:01:04.0: CardBus bridge window 1 [mem 0xa0000000-0xa3ffffff pref]: assigned
+[    1.073604] pci 0000:01:04.0: unknown [mem 0xe8000000-0xebffffff]: assigned
+[    1.073609] pci 0000:01:04.0: CardBus bridge window 1 [io  0xc400-0xc4ff]: assigned
+[    1.073614] pci 0000:01:04.0: CardBus bridge window 0 [io  0xc800-0xc8ff]: assigned
+[    1.073620] pci 0000:01:04.0: CardBus bridge to [bus 02-05]
+[    1.073624] pci 0000:01:04.0:   bridge window [io  0xc400-0xc4ff]
+[    1.073631] pci 0000:01:04.0:   bridge window [io  0xc800-0xc8ff]
+[    1.073637] pci 0000:01:04.0:   bridge window [mem 0xa0000000-0xa3ffffff pref]
+[    1.073643] pci 0000:01:04.0:   bridge window [mem 0xe8000000-0xebffffff]
+[    1.073650] pci 0000:00:1e.0: PCI bridge to [bus 01]
+[    1.073655] pci 0000:00:1e.0:   bridge window [io  0xc000-0xdfff]
+[    1.073662] pci 0000:00:1e.0:   bridge window [mem 0xe0000000-0xefffffff]
+[    1.073669] pci 0000:00:1e.0:   bridge window [mem 0xa0000000-0xafffffff pref]
+[    1.073679] pci_bus 0000:00: resource 4 [io  0x0000-0x0cf7 window]
+[    1.073684] pci_bus 0000:00: resource 5 [io  0x0d00-0xffff window]
+[    1.073688] pci_bus 0000:00: resource 6 [mem 0x000a0000-0x000bffff window]
+[    1.073693] pci_bus 0000:00: resource 7 [mem 0x000d0000-0x000dffff window]
+[    1.073697] pci_bus 0000:00: resource 8 [mem 0x000c0000-0x000cffff window]
+[    1.073702] pci_bus 0000:00: resource 9 [mem 0xffb80000-0xffbfffff]
+[    1.073706] pci_bus 0000:00: resource 10 [mem 0xfff80000-0xffffffff]
+[    1.073711] pci_bus 0000:00: resource 11 [mem 0x7e000000-0xfebfffff window]
+[    1.073716] pci_bus 0000:01: resource 0 [io  0xc000-0xdfff]
+[    1.073720] pci_bus 0000:01: resource 1 [mem 0xe0000000-0xefffffff]
+[    1.073725] pci_bus 0000:01: resource 2 [mem 0xa0000000-0xafffffff pref]
+[    1.073729] pci_bus 0000:01: resource 4 [io  0x0000-0x0cf7 window]
+[    1.073734] pci_bus 0000:01: resource 5 [io  0x0d00-0xffff window]
+[    1.073738] pci_bus 0000:01: resource 6 [mem 0x000a0000-0x000bffff window]
+[    1.073742] pci_bus 0000:01: resource 7 [mem 0x000d0000-0x000dffff window]
+[    1.073747] pci_bus 0000:01: resource 8 [mem 0x000c0000-0x000cffff window]
+[    1.073751] pci_bus 0000:01: resource 9 [mem 0xffb80000-0xffbfffff]
+[    1.073756] pci_bus 0000:01: resource 10 [mem 0xfff80000-0xffffffff]
+[    1.073760] pci_bus 0000:01: resource 11 [mem 0x7e000000-0xfebfffff window]
+[    1.073765] pci_bus 0000:02: resource 0 [io  0xc400-0xc4ff]
+[    1.073769] pci_bus 0000:02: resource 1 [io  0xc800-0xc8ff]
+[    1.073773] pci_bus 0000:02: resource 2 [mem 0xa0000000-0xa3ffffff pref]
+[    1.073778] pci_bus 0000:02: resource 3 [mem 0xe8000000-0xebffffff]
+[    1.074151] ACPI: \_SB_.PCI0.LPCB.LNKA: Enabled at IRQ 10
+[    1.074157] PCI: setting IRQ 10 as level-triggered
+[    1.498615] ACPI: \_SB_.PCI0.LPCB.LNKD: Enabled at IRQ 11
+[    1.498621] PCI: setting IRQ 11 as level-triggered
+[    1.498680] pci 0000:00:1d.1: quirk_usb_early_handoff+0x0/0x83c took 414510 usecs
+[    1.498878] ACPI: \_SB_.PCI0.LPCB.LNKC: Enabled at IRQ 11
+[    1.706607] ACPI: \_SB_.PCI0.LPCB.LNKH: Enabled at IRQ 7
+[    1.706612] PCI: setting IRQ 7 as level-triggered
+[    1.706685] pci 0000:00:1d.7: quirk_usb_early_handoff+0x0/0x83c took 202876 usecs
+[    1.706733] pci 0000:01:04.0: CLS mismatch (64 != 32), using 64 bytes
+[    1.818284] shpchp: Standard Hot Plug PCI Controller Driver version: 0.4
+[    2.173297] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+[    2.173961] serial8250: ttyS1 at I/O 0x2f8 (irq = 3, base_baud = 115200) is a 16550A
+[    2.175058] ACPI: \_SB_.PCI0.LPCB.LNKB: Enabled at IRQ 5
+[    2.175066] PCI: setting IRQ 5 as level-triggered
+[    2.204428] ata1: PATA max UDMA/100 cmd 0x1f0 ctl 0x3f6 bmdma 0x1100 irq 14
+[    2.204433] ata2: PATA max UDMA/100 cmd 0x170 ctl 0x376 bmdma 0x1108 irq 15
+[    2.206442] yenta_cardbus 0000:01:04.0: Using CSCINT to route CSC interrupts to PCI
+[    2.206446] yenta_cardbus 0000:01:04.0: Routing CardBus interrupts to PCI
+[    2.556495] yenta_cardbus 0000:01:04.0: ISA IRQ mask 0x0050, PCI irq 11
+[    2.556507] pci_bus 0000:01: Raising subordinate bus# of parent bus (#01) from #01 to #05
+[    2.556516] yenta_cardbus 0000:01:04.0: pcmcia: parent PCI bridge window: [io  0xc000-0xdfff]
+[    2.566923] yenta_cardbus 0000:01:04.0: pcmcia: parent PCI bridge window: [mem 0xe0000000-0xefffffff]
+[    2.566981] yenta_cardbus 0000:01:04.0: pcmcia: parent PCI bridge window: [mem 0xa0000000-0xafffffff pref]
+[    2.567934] uhci_hcd 0000:00:1d.0: irq 10, io port 0x00001200
+[    2.569045] ehci-pci 0000:00:1d.7: EHCI Host Controller
+[    2.569056] ehci-pci 0000:00:1d.7: new USB bus registered, assigned bus number 2
+[    2.569071] ehci-pci 0000:00:1d.7: debug port 1
+[    2.573157] ehci-pci 0000:00:1d.7: irq 7, io mem 0xfebff000
+[    2.587663] ehci-pci 0000:00:1d.7: USB 2.0 started, EHCI 1.00
+[    2.616228] uhci_hcd 0000:00:1d.1: irq 11, io port 0x00001600
+[    2.617182] uhci_hcd 0000:00:1d.2: irq 11, io port 0x00001700
+[    2.618433] i8042: PNP: PS/2 Controller [PNP0303:KBC,PNP0f13:PS2M] at 0x60,0x64 irq 1,12
+[    2.632186] serio: i8042 KBD port at 0x60,0x64 irq 1
+[    2.632197] serio: i8042 AUX0 port at 0x60,0x64 irq 12
+[    2.632306] serio: i8042 AUX1 port at 0x60,0x64 irq 12
+[    2.632382] serio: i8042 AUX2 port at 0x60,0x64 irq 12
+[    2.632470] serio: i8042 AUX3 port at 0x60,0x64 irq 12
+[    2.843690] usb 2-3: new high-speed USB device number 2 using ehci-pci
+[   41.041881] 8139cp: 8139cp: 10/100 PCI Ethernet driver v1.3 (Mar 22, 2004)
+[   41.041898] 8139cp 0000:01:02.0: This (id 10ec:8139 rev 10) is not an 8139C+ compatible chip, use 8139too
+[   41.047604] 8139too: 8139too Fast Ethernet driver 0.9.28
+[   41.064028] ACPI: \_SB_.PCI0.LPCB.LNKE: Enabled at IRQ 11
+[   41.064748] 8139too 0000:01:02.0 eth0: RealTek RTL8139 at 0x66268639, 00:40:d0:6f:2c:74, IRQ 11
+[   43.059746] ACPI: \_SB_.PCI0.LPCB.LNKG: Enabled at IRQ 11
+[   43.140020] resource: resource sanity check: requesting [mem 0x00000000000c0000-0x00000000000dffff], which spans more than PCI Bus 0000:00 [mem 0x000c0000-0x000cffff window]
+[   43.140029] caller pci_map_rom+0x78/0x1f4 mapping multiple BARs
+[   46.637514] 8139too 0000:01:02.0 enp1s2: renamed from eth0
+[   58.198790] 8139too 0000:01:02.0 enp1s2: link up, 100Mbps, full-duplex, lpa 0xC5E1

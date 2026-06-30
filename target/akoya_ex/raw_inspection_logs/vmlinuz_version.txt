@@ -1,0 +1,16 @@
+# uname -a; cat /etc/os-release 2>/dev/null; cat /etc/puppyversion 2>/dev/null
+
+ 
+Linux puppypc3464 6.6.141 #1 SMP PREEMPT_DYNAMIC Mon Jun  1 05:51:25 UTC 2026 i686 GNU/Linux
+NAME=Puppy
+VERSION="22.02"
+ID=puppy_vpup32
+VERSION_ID=22.02
+PRETTY_NAME="VoidPup32 22.02"
+ANSI_COLOR="0;34"
+CPE_NAME="cpe:/o:puppy:puppy_linux:22.02"
+HOME_URL="https://www.puppylinux.com/"
+SUPPORT_URL="https://forum.puppylinux.com"
+BUG_REPORT_URL="https://github.com/puppylinux-woof-CE/woof-CE"
+
+# exit_code=0

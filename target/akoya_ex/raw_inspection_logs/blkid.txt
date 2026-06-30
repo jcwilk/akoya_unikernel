@@ -1,0 +1,11 @@
+# blkid 2>&1
+
+ 
+/dev/loop1: BLOCK_SIZE="524288" TYPE="squashfs"
+/dev/loop2: BLOCK_SIZE="524288" TYPE="squashfs"
+/dev/loop0: BLOCK_SIZE="524288" TYPE="squashfs"
+/dev/sda1: LABEL_FATBOOT="VPUX" LABEL="VPUX" UUID="D2BC-FCEC" BLOCK_SIZE="512" TYPE="vfat" PARTUUID="cddce02b-01"
+/dev/zram0: UUID="29819f2f-52d4-447b-9e20-88ee4ca9acf6" TYPE="swap"
+/dev/loop3: BLOCK_SIZE="524288" TYPE="squashfs"
+
+# exit_code=0

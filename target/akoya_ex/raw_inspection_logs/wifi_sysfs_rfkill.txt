@@ -1,0 +1,7 @@
+# for d in /sys/class/rfkill/rfkill*; do echo "=== $d ==="; for f in name index type state soft hard persistent; do [ -f "$d/$f" ] && echo "$f=$(cat $d/$f)"; done; echo; done 2>&1
+
+ 
+=== /sys/class/rfkill/rfkill* ===
+
+
+# exit_code=0

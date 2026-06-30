@@ -1,0 +1,6 @@
+# grep -E 'ipw|wlp|01:01|wlan' /proc/interrupts 2>&1 || cat /proc/interrupts | head -5
+
+ 
+ 11:      27487    XT-PIC      yenta, uhci_hcd:usb3, uhci_hcd:usb4, firewire_ohci, enp1s2, ipw2200
+
+# exit_code=0

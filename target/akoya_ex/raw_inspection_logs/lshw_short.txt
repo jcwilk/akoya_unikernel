@@ -1,0 +1,6 @@
+# lshw -short
+
+ 
+sh: line 1: lshw: command not found
+
+# exit code: 127

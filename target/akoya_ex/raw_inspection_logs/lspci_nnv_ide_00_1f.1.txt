@@ -1,0 +1,16 @@
+# lspci -nnv -s 00:1f.1
+
+ 
+00:1f.1 IDE interface [0101]: Intel Corporation 82801DBM (ICH4-M) IDE Controller [8086:24ca] (rev 03) (prog-if 8a [ISA Compatibility mode controller, supports both channels switched to PCI native mode, supports bus mastering])
+	Subsystem: Mitac Device [1071:8011]
+	Flags: bus master, medium devsel, latency 0, IRQ 11
+	I/O ports at 01f0 [size=8]
+	I/O ports at 03f4
+	I/O ports at 0170 [size=8]
+	I/O ports at 0374
+	I/O ports at 1100 [size=16]
+	Memory at 88080000 (32-bit, non-prefetchable) [size=1K]
+	Kernel driver in use: ata_piix
+
+
+# exit_code=0

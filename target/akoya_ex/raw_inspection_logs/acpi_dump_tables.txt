@@ -1,0 +1,30 @@
+# acpidump 2>&1 | head -5; ls /sys/firmware/acpi/tables/ 2>&1; for t in /sys/firmware/acpi/tables/*; do echo "=== $t ==="; wc -c "$t" 2>/dev/null; done
+
+ 
+sh: line 1: acpidump: command not found
+BOOT
+DBGP
+DSDT
+FACP
+FACS
+SSDT
+data
+dynamic
+=== /sys/firmware/acpi/tables/BOOT ===
+40 /sys/firmware/acpi/tables/BOOT
+=== /sys/firmware/acpi/tables/DBGP ===
+52 /sys/firmware/acpi/tables/DBGP
+=== /sys/firmware/acpi/tables/DSDT ===
+12446 /sys/firmware/acpi/tables/DSDT
+=== /sys/firmware/acpi/tables/FACP ===
+116 /sys/firmware/acpi/tables/FACP
+=== /sys/firmware/acpi/tables/FACS ===
+64 /sys/firmware/acpi/tables/FACS
+=== /sys/firmware/acpi/tables/SSDT ===
+295 /sys/firmware/acpi/tables/SSDT
+=== /sys/firmware/acpi/tables/data ===
+0 /sys/firmware/acpi/tables/data
+=== /sys/firmware/acpi/tables/dynamic ===
+0 /sys/firmware/acpi/tables/dynamic
+
+# exit_code=0

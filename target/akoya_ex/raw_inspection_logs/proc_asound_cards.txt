@@ -1,0 +1,9 @@
+# cat /proc/asound/cards 2>&1
+
+ 
+ 0 [I82801DBICH4   ]: ICH4 - Intel 82801DB-ICH4
+                      Intel 82801DB-ICH4 with ALC655 at irq 5
+ 1 [Modem          ]: ICH-MODEM - Intel 82801DB-ICH4 Modem
+                      Intel 82801DB-ICH4 Modem at irq 5
+
+# exit_code=0

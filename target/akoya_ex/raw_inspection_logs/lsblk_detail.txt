@@ -1,0 +1,12 @@
+# lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINT,MODEL,SERIAL
+
+ 
+NAME     SIZE TYPE FSTYPE   MOUNTPOINT      MODEL                   SERIAL
+loop0  310.8M loop squashfs /initrd/pup_ro2                         
+loop1  111.9M loop squashfs /initrd/pup_f                           
+loop2   42.8M loop squashfs /initrd/pup_z                           
+loop3   41.1M loop squashfs /initrd/pup_a                           
+sda     14.5G disk                          FlashBlu                07089422921B9720
+`-sda1  14.5G part vfat                                             
+sr0     1024M rom                           MATSHITADVD-RAM UJ-840S MATSHITADVD-RAM_UJ-840S
+zram0    1.9G disk          [SWAP]

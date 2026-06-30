@@ -1,0 +1,43 @@
+# fdisk -l
+
+ 
+Disk /dev/loop0: 310.84 MiB, 325939200 bytes, 636600 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+Disk /dev/loop1: 111.89 MiB, 117325824 bytes, 229152 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+Disk /dev/loop2: 42.81 MiB, 44888064 bytes, 87672 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+Disk /dev/loop3: 41.12 MiB, 43114496 bytes, 84208 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+
+
+Disk /dev/sda: 14.46 GiB, 15527313408 bytes, 30326784 sectors
+Disk model: FlashBlu        
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xcddce02b
+
+Device     Boot Start      End  Sectors  Size Id Type
+/dev/sda1  *     2048 30326783 30324736 14.5G  c W95 FAT32 (LBA)
+
+
+Disk /dev/zram0: 1.88 GiB, 2019921920 bytes, 493145 sectors
+Units: sectors of 1 * 4096 = 4096 bytes
+Sector size (logical/physical): 4096 bytes / 4096 bytes
+I/O size (minimum/optimal): 4096 bytes / 4096 bytes

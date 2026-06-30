@@ -1,0 +1,6 @@
+# rfkill list all 2>&1; echo '---'; rfkill list 2>&1
+
+ 
+---
+
+# exit_code=0

@@ -1,0 +1,57 @@
+# iw phy 2>&1 | head -120
+
+ 
+Wiphy phy2
+	wiphy index: 2
+	max # scan SSIDs: 1
+	max scan IEs length: 0 bytes
+	max # sched scan SSIDs: 0
+	max # match sets: 0
+	Retry short limit: 7
+	Retry long limit: 4
+	Coverage class: 0 (up to 0m)
+	Supported Ciphers:
+		* WEP40 (00-0f-ac:1)
+		* WEP104 (00-0f-ac:5)
+		* TKIP (00-0f-ac:2)
+		* CCMP-128 (00-0f-ac:4)
+	Available Antennas: TX 0 RX 0
+	Supported interface modes:
+		 * IBSS
+		 * managed
+	Band 1:
+		Bitrates (non-HT):
+			* 1.0 Mbps
+			* 2.0 Mbps (short preamble supported)
+			* 5.5 Mbps (short preamble supported)
+			* 11.0 Mbps (short preamble supported)
+			* 6.0 Mbps
+			* 9.0 Mbps
+			* 12.0 Mbps
+			* 18.0 Mbps
+			* 24.0 Mbps
+			* 36.0 Mbps
+			* 48.0 Mbps
+			* 54.0 Mbps
+		Frequencies:
+			* 2412.0 MHz [1] (20.0 dBm)
+			* 2417.0 MHz [2] (20.0 dBm)
+			* 2422.0 MHz [3] (20.0 dBm)
+			* 2427.0 MHz [4] (20.0 dBm)
+			* 2432.0 MHz [5] (20.0 dBm)
+			* 2437.0 MHz [6] (20.0 dBm)
+			* 2442.0 MHz [7] (20.0 dBm)
+			* 2447.0 MHz [8] (20.0 dBm)
+			* 2452.0 MHz [9] (20.0 dBm)
+			* 2457.0 MHz [10] (20.0 dBm)
+			* 2462.0 MHz [11] (20.0 dBm)
+	Supported commands:
+	software interface modes (can always be added):
+	interface combinations are not supported
+	Device supports scan flush.
+	max # scan plans: 1
+	max scan plan interval: -1
+	max scan plan iterations: 0
+	Supported extended features:
+
+# exit_code=0

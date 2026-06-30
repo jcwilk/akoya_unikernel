@@ -1,0 +1,21 @@
+# lspci -tv
+
+ 
+-[0000:00]-+-00.0  Intel Corporation 82852/82855 GM/GME/PM/GMV Processor to I/O Controller
+           +-00.1  Intel Corporation 82852/82855 GM/GME/PM/GMV Processor to I/O Controller
+           +-00.3  Intel Corporation 82852/82855 GM/GME/PM/GMV Processor to I/O Controller
+           +-02.0  Intel Corporation 82852/855GM Integrated Graphics Device
+           +-02.1  Intel Corporation 82852/855GM Integrated Graphics Device
+           +-1d.0  Intel Corporation 82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #1
+           +-1d.1  Intel Corporation 82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #2
+           +-1d.2  Intel Corporation 82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) USB UHCI Controller #3
+           +-1d.7  Intel Corporation 82801DB/DBM (ICH4/ICH4-M) USB2 EHCI Controller
+           +-1e.0-[01-05]--+-01.0  Intel Corporation PRO/Wireless 2200BG [Calexico2] Network Connection
+           |               +-02.0  Realtek Semiconductor Co., Ltd. RTL-8100/8101L/8139 PCI Fast Ethernet Adapter
+           |               +-04.0-[02-05]--
+           |               \-05.0  VIA Technologies, Inc. VT6306/7/8 [Fire II(M)] IEEE 1394 OHCI Controller
+           +-1f.0  Intel Corporation 82801DBM (ICH4-M) LPC Interface Bridge
+           +-1f.1  Intel Corporation 82801DBM (ICH4-M) IDE Controller
+           +-1f.3  Intel Corporation 82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) SMBus Controller
+           +-1f.5  Intel Corporation 82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Audio Controller
+           \-1f.6  Intel Corporation 82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Modem Controller

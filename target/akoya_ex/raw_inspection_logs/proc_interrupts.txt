@@ -1,0 +1,35 @@
+# cat /proc/interrupts
+
+ 
+           CPU0       
+  0:    1000073    XT-PIC      timer
+  1:       5961    XT-PIC      i8042
+  2:          0    XT-PIC      cascade
+  5:        317    XT-PIC      snd_intel8x0m, snd_intel8x0
+  7:      29319    XT-PIC      ehci_hcd:usb2
+  8:          0    XT-PIC      rtc0
+  9:        130    XT-PIC      acpi
+ 10:        189    XT-PIC      uhci_hcd:usb1, i915
+ 11:      13923    XT-PIC      yenta, uhci_hcd:usb3, uhci_hcd:usb4, firewire_ohci, enp1s2
+ 12:      44704    XT-PIC      i8042
+ 14:          0    XT-PIC      ata_piix
+ 15:       1524    XT-PIC      ata_piix
+NMI:          0   Non-maskable interrupts
+LOC:          0   Local timer interrupts
+SPU:          0   Spurious interrupts
+PMI:          0   Performance monitoring interrupts
+IWI:          0   IRQ work interrupts
+RTR:          0   APIC ICR read retries
+RES:          0   Rescheduling interrupts
+CAL:          0   Function call interrupts
+TLB:          0   TLB shootdowns
+TRM:          0   Thermal event interrupts
+THR:          0   Threshold APIC interrupts
+DFR:          0   Deferred Error APIC interrupts
+MCE:          0   Machine check exceptions
+MCP:         12   Machine check polls
+ERR:          0
+MIS:          0
+PIN:          0   Posted-interrupt notification event
+NPI:          0   Nested posted-interrupt event
+PIW:          0   Posted-interrupt wakeup event

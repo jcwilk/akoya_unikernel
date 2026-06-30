@@ -1,0 +1,18 @@
+# lspci -k -s 01:01.0; echo; lspci -nnv -s 01:01.0
+
+ 
+01:01.0 Network controller: Intel Corporation PRO/Wireless 2200BG [Calexico2] Network Connection (rev 05)
+	Subsystem: Intel Corporation WM3B2200BG Mini-PCI Card
+	Kernel driver in use: ipw2200
+	Kernel modules: ipw2200
+
+01:01.0 Network controller [0280]: Intel Corporation PRO/Wireless 2200BG [Calexico2] Network Connection [8086:4220] (rev 05)
+	Subsystem: Intel Corporation WM3B2200BG Mini-PCI Card [8086:2701]
+	Flags: bus master, medium devsel, latency 64, IRQ 11
+	Memory at e0001000 (32-bit, non-prefetchable) [size=4K]
+	Capabilities: [dc] Power Management version 2
+	Kernel driver in use: ipw2200
+	Kernel modules: ipw2200
+
+
+# exit_code=0
