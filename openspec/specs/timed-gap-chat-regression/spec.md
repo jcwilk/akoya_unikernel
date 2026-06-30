@@ -41,7 +41,7 @@ The timed-gap chat regression boot image SHALL exercise the same production inte
 
 ### Requirement: Bounded timed idle between scheduled turns
 
-The timed-gap chat regression boot image SHALL run without operator keyboard input. Between scheduled chat turns it SHALL wait at the input prompt using bounded timed blocking for a configured duration rather than waiting for human typing, mimicking operator pacing and headful idle-at-prompt conditions where no keyboard input occurs during the gap. The wait SHALL use guest millisecond timing that reflects the configured duration on deployment hardware and on CPU-faithful emulation within the tolerance defined by the guest-timekeeping capability.
+The timed-gap chat regression boot image SHALL run without operator keyboard input. Between scheduled chat turns it SHALL wait at the input prompt for a configured duration using event-runtime scheduled timing rather than blocking the entire guest on keyboard availability or busy-waiting for the gap to elapse, mimicking operator pacing and headful idle-at-prompt conditions where no keyboard input occurs during the gap. The wait SHALL use guest millisecond timing that reflects the configured duration on deployment hardware and on CPU-faithful emulation within the tolerance defined by the guest-timekeeping capability.
 
 #### Scenario: Timed gap at input prompt
 
@@ -58,6 +58,13 @@ The timed-gap chat regression boot image SHALL run without operator keyboard inp
 - **WHEN** the suite executes between consecutive turns
 - **THEN** progress does not depend on integrated keyboard input or external serial typing
 - **AND** the minimal interactive chat input prompt may appear during the timed idle gap as in the main session
+
+#### Scenario: Gap does not busy-spin
+
+- **GIVEN** a configured inter-turn idle gap is in progress
+- **WHEN** no operator input and no unrelated protocol work is pending
+- **THEN** the guest idles rather than continuously polling at full CPU utilization for the entire gap
+- **AND** the gap duration still meets the configured tolerance when the next turn begins
 
 ### Requirement: Multi-turn schedule with per-turn and aggregate reporting
 
