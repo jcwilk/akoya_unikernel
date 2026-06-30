@@ -48,12 +48,37 @@ suggest_package() {
     fi
 }
 
-check_host_tool() {
-    local tool="$1"
-    local pkg="$2"
-    if ! command -v "${tool}" >/dev/null 2>&1; then
-        fail "required host tool '${tool}' not found; $(suggest_package "${pkg}")"
+check_host_dependencies() {
+    local missing=()
+    local tool pkg
+
+    while [[ $# -gt 0 ]]; do
+        tool="$1"
+        pkg="$2"
+        shift 2
+        if ! command -v "${tool}" >/dev/null 2>&1; then
+            missing+=("${tool} (install package: ${pkg})")
+        fi
+    done
+
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        return 0
     fi
+
+    log "ERROR: missing ISO packaging dependencies:"
+    local item
+    for item in "${missing[@]}"; do
+        log "  - ${item}"
+    done
+    log ""
+    log "Install on Debian/Ubuntu:"
+    log "  sudo apt install grub-pc-bin xorriso"
+    log ""
+    log "Then re-run:"
+    log "  make iso"
+
+    emit_result "failure" "missing ISO packaging dependencies; run: sudo apt install grub-pc-bin xorriso"
+    exit 1
 }
 
 resolve_grub_mod_dir() {
@@ -87,11 +112,26 @@ ensure_kernel() {
 }
 
 main() {
+    if [[ "${1:-}" == "--check-deps-only" ]]; then
+        mkdir -p "${BUILD_DIR}"
+        : > "${LOG_FILE}"
+        check_host_dependencies \
+            "${GRUB_MKRESCUE}" "grub-pc-bin" \
+            "${XORRISO}" "xorriso"
+        local grub_mod_dir
+        if ! grub_mod_dir="$(resolve_grub_mod_dir)"; then
+            fail "GRUB i386-pc modules not found (missing multiboot.mod); $(suggest_package "grub-pc-bin")"
+        fi
+        log "ISO packaging dependencies OK (GRUB modules: ${grub_mod_dir})"
+        exit 0
+    fi
+
     mkdir -p "${BUILD_DIR}"
     : > "${LOG_FILE}"
 
-    check_host_tool "${GRUB_MKRESCUE}" "grub-pc-bin"
-    check_host_tool "${XORRISO}" "xorriso"
+    check_host_dependencies \
+        "${GRUB_MKRESCUE}" "grub-pc-bin" \
+        "${XORRISO}" "xorriso"
 
     local grub_mod_dir
     if ! grub_mod_dir="$(resolve_grub_mod_dir)"; then

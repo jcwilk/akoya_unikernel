@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tear down ephemeral macvtap used for QEMU LAN passthrough.
-# MUST run as root (sudo). Never modifies WiFi or NetworkManager profiles.
+# Requires CAP_NET_ADMIN (installed via scripts/install-bridge-libexec.sh).
 set -euo pipefail
 
 STATE_FILE="${AKOYA_QEMU_STATE_FILE:-/tmp/akoya-qemu-bridge.state}"
@@ -9,11 +9,6 @@ MACVTAP_IF="${AKOYA_QEMU_TAP_IF:-akoya-qemu0}"
 log() {
     printf 'qemu-bridge-down.sh: %s\n' "$*" >&2
 }
-
-if [[ "${EUID}" -ne 0 ]]; then
-    log "ERROR: must run as root (e.g. sudo $0)"
-    exit 1
-fi
 
 if [[ -f "${STATE_FILE}" ]]; then
     # shellcheck disable=SC1090

@@ -30,6 +30,7 @@ MODE=""
 IMAGE_PATH=""
 LOGICAL_ID=""
 BOOT_ISO_PATH=""
+BOOT_DISK_PATH=""
 ISO_SMOKE=0
 SCRIPT_FILE=""
 SCRIPT_INJECT_STATUS=0
@@ -38,13 +39,14 @@ EXIT_ON_GUEST_DONE=""
 
 usage() {
     cat >&2 <<EOF
-Usage: $0 (--headful|--headless) [--image PATH | --logical NAME | --boot-iso PATH] [--script FILE] [--exit-on-guest-done | --hold]
+Usage: $0 (--headful|--headless) [--image PATH | --logical NAME | --boot-iso PATH | --boot-disk PATH] [--script FILE] [--exit-on-guest-done | --hold]
 
   --headful     Interactive SDL display window
   --headless    No display; smoke-test timeout and bootstrap/network assertions
   --image PATH  Boot image to run (default: auto-select when exactly one logical image exists)
   --logical NAME  Select logical image stem (e.g. kernel, transport-test)
-  --boot-iso PATH  Boot from BIOS/Legacy optical media (mutually exclusive with --image / --logical)
+  --boot-iso PATH  Boot from BIOS/Legacy optical media (mutually exclusive with --image / --logical / --boot-disk)
+  --boot-disk PATH Boot from raw MBR disk image as first hard disk (USB/HDD image from make usb)
   --script FILE Headless scripted chat interaction with output assertions (*.akoya-script)
 
   --exit-on-guest-done  QEMU exits when the guest finishes (default for --headless)
@@ -63,13 +65,14 @@ Environment:
   AKOYA_CHAT_SCRIPT        Legacy space-separated sendkey names when AKOYA_USE_KEYBOARD_SCRIPT=1
   AKOYA_USE_KEYBOARD_SCRIPT 1 = use AKOYA_CHAT_SCRIPT instead of default multi-turn *.akoya-script
   AKOYA_AUTO_LAN          1 = macvtap up/down around each run (default: 1)
-  AKOYA_LAN_LIBEXEC       Installed helper scripts for passwordless sudo (default: /usr/local/libexec/akoya)
+  AKOYA_LAN_LIBEXEC       Installed helper scripts with CAP_NET_ADMIN (default: /usr/local/libexec/akoya)
   AKOYA_SKIP_INFERENCE_PREFLIGHT  1 = skip chat-endpoint pre-flight (ISO smoke / verify-boot-iso)
 
-ISO boot (--boot-iso) uses BIOS/Legacy optical boot order and, in headless mode, a lighter
-assertion profile: bootstrap message plus connectivity-probe success only (no multi-turn chat).
+ISO boot (--boot-iso) uses BIOS/Legacy optical media. Disk boot (--boot-disk) uses -hda
+(boot order c) for akoya-boot.img from make usb. Both skip inference pre-flight in
+headless mode and assert bootstrap + connectivity probe only.
 
-Install ${LAN_LIBEXEC}/qemu-bridge-{up,down}.sh with matching sudoers; see README.
+Install ${LAN_LIBEXEC}/qemu-bridge-{up,down} via scripts/install-bridge-libexec.sh (one-time admin); see README.
 
 Requires: qemu-system-i386 (qemu-system-x86 package on Debian/Ubuntu).
 EOF
@@ -224,14 +227,19 @@ count_plain_reply_lines() {
 
 lan_script_path() {
     local name="$1"
-    local libexec="${LAN_LIBEXEC%/}/${name}"
-    if [[ -x "${libexec}" ]]; then
-        echo "${libexec}"
+    local base="${name%.sh}"
+    local libexec="${LAN_LIBEXEC%/}"
+
+    if [[ -x "${libexec}/${base}" ]]; then
+        echo "${libexec}/${base}"
         return 0
     fi
-    local repo_script="${ROOT_DIR}/scripts/${name}"
-    if [[ -x "${repo_script}" ]]; then
-        echo "${repo_script}"
+    if [[ -x "${libexec}/${name}" ]]; then
+        echo "${libexec}/${name}"
+        return 0
+    fi
+    if [[ -x "${ROOT_DIR}/scripts/${name}" ]]; then
+        echo "${ROOT_DIR}/scripts/${name}"
         return 0
     fi
     return 1
@@ -240,20 +248,11 @@ lan_script_path() {
 run_lan_script() {
     local script="$1"
 
-    if [[ "${EUID}" -eq 0 ]]; then
-        AKOYA_QEMU_LAN_IF="${LAN_IF}" \
-            AKOYA_QEMU_WIFI_IF="${AKOYA_QEMU_WIFI_IF:-wlp82s0}" \
-            AKOYA_QEMU_TAP_IF="${MACVTAP_IF}" \
-            AKOYA_QEMU_STATE_FILE="${STATE_FILE}" \
-            "${script}"
-        return $?
-    fi
-
-    if ! command -v sudo >/dev/null 2>&1; then
-        return 127
-    fi
-
-    sudo -n "${script}"
+    AKOYA_QEMU_LAN_IF="${LAN_IF}" \
+        AKOYA_QEMU_WIFI_IF="${AKOYA_QEMU_WIFI_IF:-wlp82s0}" \
+        AKOYA_QEMU_TAP_IF="${MACVTAP_IF}" \
+        AKOYA_QEMU_STATE_FILE="${STATE_FILE}" \
+        "${script}"
 }
 
 lan_up() {
@@ -284,8 +283,8 @@ lan_up() {
     done
 
     fail "ephemeral macvtap setup failed. See ${up_script} output above.
-Install libexec scripts + sudoers (README), or run manually:
-  sudo -n ${LAN_LIBEXEC}/qemu-bridge-up.sh
+Install libexec helpers once (README: scripts/install-bridge-libexec.sh), or run manually:
+  ${LAN_LIBEXEC}/qemu-bridge-up
 Or set AKOYA_AUTO_LAN=0 if macvtap is already configured."
 }
 
@@ -309,12 +308,12 @@ check_lan_prerequisites() {
 
     if [[ ! -d "/sys/class/net/${MACVTAP_IF}" ]]; then
         fail "macvtap '${MACVTAP_IF}' not found after setup.
-Run: sudo -n ${LAN_LIBEXEC}/qemu-bridge-up.sh"
+Run: ${LAN_LIBEXEC}/qemu-bridge-up"
     fi
 
     if [[ ! -f "${STATE_FILE}" ]]; then
         fail "state file '${STATE_FILE}' missing after setup.
-Run: sudo -n ${LAN_LIBEXEC}/qemu-bridge-up.sh"
+Run: ${LAN_LIBEXEC}/qemu-bridge-up"
     fi
 
     # shellcheck disable=SC1090
@@ -354,6 +353,11 @@ while [[ $# -gt 0 ]]; do
             ISO_SMOKE=1
             shift 2
             ;;
+        --boot-disk)
+            BOOT_DISK_PATH="$2"
+            ISO_SMOKE=1
+            shift 2
+            ;;
         --script)
             SCRIPT_FILE="$2"
             shift 2
@@ -387,11 +391,21 @@ if [[ -z "${MODE}" ]]; then
 fi
 
 if [[ -n "${BOOT_ISO_PATH}" ]]; then
-    if [[ -n "${IMAGE_PATH}" || -n "${LOGICAL_ID}" ]]; then
-        fail "specify only one of --boot-iso PATH, --image PATH, or --logical NAME"
+    if [[ -n "${IMAGE_PATH}" || -n "${LOGICAL_ID}" || -n "${BOOT_DISK_PATH}" ]]; then
+        fail "specify only one of --boot-iso, --boot-disk, --image, or --logical"
     fi
     if [[ ! -f "${BOOT_ISO_PATH}" ]]; then
         fail "boot ISO not found: ${BOOT_ISO_PATH}"
+    fi
+    ISO_SMOKE=1
+fi
+
+if [[ -n "${BOOT_DISK_PATH}" ]]; then
+    if [[ -n "${IMAGE_PATH}" || -n "${LOGICAL_ID}" || -n "${BOOT_ISO_PATH}" ]]; then
+        fail "specify only one of --boot-iso, --boot-disk, --image, or --logical"
+    fi
+    if [[ ! -f "${BOOT_DISK_PATH}" ]]; then
+        fail "boot disk image not found: ${BOOT_DISK_PATH}"
     fi
     ISO_SMOKE=1
 fi
@@ -423,7 +437,7 @@ if [[ -z "${EXIT_ON_GUEST_DONE}" ]]; then
 fi
 
 if ! command -v "${QEMU_BIN}" >/dev/null 2>&1; then
-    fail "${QEMU_BIN} not found; install qemu-system-x86 (e.g. sudo apt install qemu-system-x86)"
+    fail "${QEMU_BIN} not found; install qemu-system-x86 (apt install qemu-system-x86)"
 fi
 
 if [[ "${MODE}" == "headless" && "${AKOYA_SKIP_INFERENCE_PREFLIGHT:-0}" != "1" && "${ISO_SMOKE}" -eq 0 ]]; then
@@ -527,6 +541,8 @@ main() {
     local transport_mode=0
     if [[ -n "${BOOT_ISO_PATH}" ]]; then
         kernel_image="${BOOT_ISO_PATH}"
+    elif [[ -n "${BOOT_DISK_PATH}" ]]; then
+        kernel_image="${BOOT_DISK_PATH}"
     else
         kernel_image="$(resolve_kernel_image)"
         if image_is_transport_test "${kernel_image}"; then
@@ -549,6 +565,8 @@ main() {
     else
         if [[ "${EXIT_ON_GUEST_DONE}" -eq 0 ]]; then
             echo "Running QEMU headless with --hold (no auto-exit on guest shutdown)" | tee -a "${LOG_FILE}"
+        elif [[ "${ISO_SMOKE}" -eq 1 && -n "${BOOT_DISK_PATH}" ]]; then
+            echo "Running QEMU headless disk smoke test (timeout ${TIMEOUT_SEC}s, boot disk: ${BOOT_DISK_PATH})" | tee -a "${LOG_FILE}"
         elif [[ "${ISO_SMOKE}" -eq 1 ]]; then
             echo "Running QEMU headless ISO smoke test (timeout ${TIMEOUT_SEC}s, boot ISO: ${BOOT_ISO_PATH})" | tee -a "${LOG_FILE}"
         elif [[ -n "${SCRIPT_FILE}" ]]; then
@@ -558,8 +576,10 @@ main() {
         fi
     fi
 
-    if [[ "${ISO_SMOKE}" -eq 1 ]]; then
+    if [[ "${ISO_SMOKE}" -eq 1 && -n "${BOOT_ISO_PATH}" ]]; then
         echo "Boot ISO: ${BOOT_ISO_PATH}" | tee -a "${LOG_FILE}"
+    elif [[ "${ISO_SMOKE}" -eq 1 && -n "${BOOT_DISK_PATH}" ]]; then
+        echo "Boot disk: ${BOOT_DISK_PATH}" | tee -a "${LOG_FILE}"
     else
         echo "Boot image: ${kernel_image}" | tee -a "${LOG_FILE}"
     fi
@@ -606,8 +626,10 @@ main() {
         fi
     fi
 
-    if [[ "${ISO_SMOKE}" -eq 1 ]]; then
+    if [[ "${ISO_SMOKE}" -eq 1 && -n "${BOOT_ISO_PATH}" ]]; then
         qemu_args+=(-boot order=d -cdrom "${BOOT_ISO_PATH}")
+    elif [[ "${ISO_SMOKE}" -eq 1 && -n "${BOOT_DISK_PATH}" ]]; then
+        qemu_args+=(-boot order=c -hda "${BOOT_DISK_PATH}")
     else
         qemu_args+=(-kernel "${kernel_image}")
     fi

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ephemeral macvtap setup for QEMU LAN passthrough on a designated wired interface.
 # The physical parent keeps its host IP; no bridge enslavement or NM profile changes.
-# MUST run as root (sudo). Never uses or modifies WiFi.
+# Requires CAP_NET_ADMIN (installed via scripts/install-bridge-libexec.sh). Never uses WiFi.
 set -euo pipefail
 
 STATE_FILE="${AKOYA_QEMU_STATE_FILE:-/tmp/akoya-qemu-bridge.state}"
@@ -21,10 +21,6 @@ fail() {
     log "ERROR: $*"
     exit 1
 }
-
-if [[ "${EUID}" -ne 0 ]]; then
-    fail "must run as root (e.g. sudo $0)"
-fi
 
 if [[ "${LAN_IF}" == "${WIFI_IF}" ]]; then
     fail "LAN interface must not be the WiFi interface (${WIFI_IF})"
@@ -83,10 +79,7 @@ if ! ip link set "${MACVTAP_IF}" up; then
     fail "failed to bring up macvtap ${MACVTAP_IF}"
 fi
 
-TAP_USER="${SUDO_USER:-${AKOYA_QEMU_USER:-root}}"
-if [[ "${TAP_USER}" == "root" ]] && command -v logname >/dev/null 2>&1; then
-    TAP_USER="$(logname 2>/dev/null || echo root)"
-fi
+TAP_USER="${AKOYA_QEMU_USER:-${SUDO_USER:-$(id -un)}}"
 
 TAP_INDEX="$(cat "/sys/class/net/${MACVTAP_IF}/ifindex")"
 TAP_DEV="/dev/tap${TAP_INDEX}"
@@ -97,8 +90,9 @@ if [[ ! -e "${TAP_DEV}" ]]; then
 fi
 
 if [[ "${TAP_USER}" != "root" ]]; then
-    chown "${TAP_USER}:${TAP_USER}" "${TAP_DEV}" 2>/dev/null || \
-        log "warning: could not chown ${TAP_DEV} to ${TAP_USER}; run QEMU as root or adjust permissions"
+    if ! chown "${TAP_USER}:${TAP_USER}" "${TAP_DEV}" 2>/dev/null; then
+        fail "could not chown ${TAP_DEV} to ${TAP_USER}; re-run scripts/install-bridge-libexec.sh as admin (needs cap_chown on bridge-cap-exec)"
+    fi
 fi
 
 cat > "${STATE_FILE}" <<EOF

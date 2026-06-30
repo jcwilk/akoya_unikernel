@@ -30,7 +30,23 @@ Development workstation (Linux):
 
 - **Node.js 20.19+** for OpenSpec Flow (`npx @fission-ai/openspec@latest …`).
 
-- **ISO packaging (workstation):** `grub-mkrescue` (package `grub-pc-bin`) and `xorriso` for `make iso` / `scripts/build-boot-iso.sh`.
+- **ISO packaging (required for `make iso`):** `grub-mkrescue` and `xorriso`. **`make iso` exits immediately if either is missing** — install before packaging:
+
+  ```bash
+  sudo apt install grub-pc-bin xorriso
+  make iso-deps   # optional: verify tools without building
+  ```
+
+  Output artifact: `build/akoya-boot.iso` (~2–3 MB).
+
+- **USB/HDD disk image (required for `make usb` / `make etcher`):** `grub-install`, `genext2fs`, `sfdisk`, and `dd`. **`make usb` exits immediately if any are missing** — install before packaging:
+
+  ```bash
+  apt install grub-pc-bin genext2fs util-linux
+  make usb
+  ```
+
+  Output artifact: `build/akoya-boot.img` (64 MiB MBR + ext2 + GRUB; symlink `build/akoya-etcher.img` for Etcher).
 
 ## Build and test
 
@@ -38,8 +54,11 @@ Development workstation (Linux):
 make build    # cross-compile bootstrap kernel → build/kernel.elf, build/kernel.bin, build/transport-test.*
 make test     # build (if needed) + headless macvtap QEMU smoke test
 make run      # build (if needed) + headful interactive macvtap QEMU session
-make iso      # build (if needed) + package BIOS/Legacy boot ISO → build/akoya-boot.iso
-make verify-iso  # package (if needed) + headless QEMU boot-from-ISO smoke (bootstrap + connectivity probe)
+make iso          # BIOS/Legacy ISO → build/akoya-boot.iso (QEMU optical verify; not for USB dd on legacy BIOS)
+make verify-iso   # QEMU boot-from-ISO smoke
+make usb          # MBR+ext2 disk image → build/akoya-boot.img (+ akoya-etcher.img symlink for Etcher)
+make etcher       # alias for make usb
+make verify-usb   # QEMU boot-from-disk smoke (builds image if missing)
 make clean    # remove build/ artifacts
 ```
 
@@ -137,28 +156,30 @@ On failure you may see `net_ip=fail reason=…`, `net_link=fail reason=nic`, `ne
 
 **Mandatory on every run path** (headless and headful): the guest RTL8139 uses project MAC `52:54:00:12:34:56` when libexec scripts pin the macvtap interface MAC. Ephemeral setup creates `akoya-qemu0` on the wired parent only; the host keeps its IP on the physical NIC.
 
-Install helpers and passwordless sudo (once per workstation):
+One-time admin install (once per workstation). After this, `make test` and `make run` work as your normal user:
 
 ```bash
 sudo bash scripts/install-bridge-libexec.sh
-sudo visudo -f /etc/sudoers.d/akoya-qemu-bridge
-# paste from scripts/sudoers.d/akoya-qemu-bridge.example
 ```
+
+This copies macvtap helpers to `/usr/local/libexec/akoya/` and applies `cap_net_admin` via `bridge-cap-exec` so unprivileged runs can create ephemeral macvtap devices.
 
 | Script | Purpose |
 |--------|---------|
 | `scripts/qemu-bridge-up.sh` | Creates macvtap on wired LAN only; sets guest MAC; writes `/tmp/akoya-qemu-bridge.state` |
 | `scripts/qemu-bridge-down.sh` | Deletes macvtap; removes state file |
-| `scripts/install-bridge-libexec.sh` | Copies the above into `/usr/local/libexec/akoya/` |
+| `scripts/install-bridge-libexec.sh` | One-time admin install: copies helpers + `setcap cap_net_admin+ep` on `bridge-cap-exec` |
 
 Manual cycle (same as `make test` internally):
 
 ```bash
 printf 'GUEST_MAC=52:54:00:12:34:56\n' >/tmp/akoya-qemu-guest-mac
-sudo -n /usr/local/libexec/akoya/qemu-bridge-up.sh
+/usr/local/libexec/akoya/qemu-bridge-up
 bash scripts/run-qemu.sh --headless
-sudo -n /usr/local/libexec/akoya/qemu-bridge-down.sh   # always, including on failure
+/usr/local/libexec/akoya/qemu-bridge-down   # always, including on failure
 ```
+
+**Legacy optional path:** passwordless sudoers via `scripts/sudoers.d/akoya-qemu-bridge.example` — not required when the setcap install succeeds.
 
 Set `AKOYA_AUTO_LAN=0` if macvtap is already configured.
 
@@ -208,52 +229,96 @@ Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `buil
 | `AKOYA_QEMU_GUEST_MAC` | `52:54:00:12:34:56` | Fixed guest MAC (when libexec pins macvtap) |
 | `AKOYA_QEMU_TAP_IF` | `akoya-qemu0` | Macvtap interface name |
 | `AKOYA_AUTO_LAN` | `1` | Ephemeral macvtap up/down around each run |
-| `AKOYA_LAN_LIBEXEC` | `/usr/local/libexec/akoya` | Installed helper scripts for passwordless sudo |
+| `AKOYA_LAN_LIBEXEC` | `/usr/local/libexec/akoya` | Installed macvtap helpers (capability-bound after one-time install) |
 | `AKOYA_CHAT_HOST_IP` | `192.168.1.110` | Chat endpoint host for pre-flight reachability check |
 | `AKOYA_CHAT_PORT` | `11435` | Chat endpoint port for pre-flight reachability check |
 | `AKOYA_CHAT_SCRIPT` | `h i ret w h a t ret q u i t ret` | Legacy headless sendkey sequence when `AKOYA_USE_KEYBOARD_SCRIPT=1` |
-| `AKOYA_USE_KEYBOARD_SCRIPT` | `0` | `1` selects `AKOYA_CHAT_SCRIPT` instead of the default multi-turn `*.akoya-script` |
-
 | `AKOYA_USE_KEYBOARD_SCRIPT` | `0` | `1` selects `AKOYA_CHAT_SCRIPT` instead of the default multi-turn `*.akoya-script` |
 | `AKOYA_SKIP_INFERENCE_PREFLIGHT` | `0` | `1` skips chat-endpoint pre-flight (set by `verify-boot-iso.sh` / `--boot-iso` smoke) |
 
 ## Bare-metal boot
 
-### Automated ISO (primary)
+### USB flash drive (primary — use this on the Akoya)
 
-1. On the development workstation, install packaging tools if needed:
+#### Balena Etcher (recommended)
+
+Etcher is **compatible** with this project. It writes the selected file byte-for-byte to the USB device—the same operation as `dd`. Use the **`.img` disk image**, not the `.iso`:
+
+| File | Etcher | Akoya USB boot |
+|------|--------|----------------|
+| `build/akoya-boot.img` (or `akoya-etcher.img`) | Yes — select this | Works (MBR + ext2 + GRUB) |
+| `build/akoya-boot.iso` | Yes — Etcher will flash it | **Broken** on legacy BIOS (GRUB `hd0` geometry errors → rescue mode) |
+
+The ISO failure is **not** an Etcher limitation. You can verify independently: flash the ISO with Etcher, observe the GRUB rescue errors; flash the `.img` with Etcher on the same stick, boot succeeds. Etcher and `dd` produce identical USB contents for a given input file (`cmp` the first N MiB of the device after each write if you want to prove it).
+
+**Etcher steps:**
+
+1. Build the disk image on your workstation:
 
    ```bash
-   sudo apt install grub-pc-bin xorriso
+   apt install grub-pc-bin genext2fs util-linux
+   make usb
    ```
 
-2. Build and package:
+2. Open Balena Etcher → **Flash from file** → choose `build/akoya-etcher.img` (or `build/akoya-boot.img`).
+
+3. Select the USB target drive (not a partition).
+
+4. Flash. Etcher validates the write; no extra steps.
+
+5. Boot the Akoya from USB in **Legacy/BIOS** mode (not UEFI).
+
+Optional pre-hardware check: `make verify-usb` (QEMU boots the same `.img` as a hard disk).
+
+#### Command-line alternative (`dd`)
+
+**Do not** use `build/akoya-boot.iso` for USB on legacy BIOS — see table above.
+
+1. Install packaging tools on the development workstation:
 
    ```bash
-   make iso
+   apt install grub-pc-bin genext2fs util-linux
    ```
 
-   Success prints `AKOYA_ISO_RESULT=status=success;iso=build/akoya-boot.iso;...`. The ISO volume label and GRUB menu title include the git build-id for operator identification.
+2. Build the USB/HDD disk image (unprivileged — user-space ext2 assembly + GRUB into a plain file):
 
-3. **USB flash (removable):** write the whole ISO to the device (not a partition). **Double-check the device node** — `dd` to the wrong disk is destructive.
+   ```bash
+   make usb
+   ```
+
+   Success prints `AKOYA_USB_RESULT=status=success;img=build/akoya-boot.img;...`. Output is a 64 MiB MBR + ext2 image with GRUB in the MBR and `kernel.elf` on the partition. A symlink `build/akoya-etcher.img` points at the same file for Etcher workflows.
+
+3. Write the **disk image** to the whole USB device (Etcher or `dd`):
 
    ```bash
    lsblk
-   sudo dd if=build/akoya-boot.iso of=/dev/sdX bs=4M status=progress conv=fsync
+   sudo dd if=build/akoya-boot.img of=/dev/sdX bs=4M status=progress conv=fsync
    sync
    ```
 
-   Replace `/dev/sdX` with your USB stick (e.g. `/dev/sdb`). Unplug other removable drives while selecting the target to reduce mistakes.
+   Replace `/dev/sdX` with the USB stick (e.g. `/dev/sdb`), **not** a partition like `/dev/sdb1`.
 
-4. **Internal boot drive:** the same whole-disk `dd` pattern applies when imaging an internal HDD/SSD intended as the boot device. Alternatively, write to a dedicated boot partition with your preferred imaging tool; ensure the firmware boot order selects that device.
+4. Connect the Akoya RJ-45 port to a LAN with DHCP.
 
-5. Connect the Akoya RJ-45 port to a LAN with DHCP.
+5. Boot from USB in the firmware menu (Legacy/BIOS mode, not UEFI).
 
-6. Enter the firmware boot menu (typical legacy key: F8, F12, or Esc during POST) and select **USB** or **HDD** as appropriate.
+6. Confirm console output matches **Expected console output** (bootstrap line, `net_ip=`, connectivity probe, then chat session).
 
-7. On first boot, confirm console output matches **Expected console output** (bootstrap line, `net_ip=`, connectivity probe, then chat session).
+Pre-hardware confidence: `make verify-usb` (QEMU boots `akoya-boot.img` as `-hda`; bootstrap + connectivity probe; no inference pre-flight).
 
-Pre-hardware confidence: run `make verify-iso` on the workstation (QEMU boot-from-ISO, bootstrap + connectivity probe; no inference pre-flight).
+### ISO (QEMU / optical media only)
+
+For emulation or an internal optical drive, not recommended for USB sticks on legacy BIOS:
+
+```bash
+sudo apt install grub-pc-bin xorriso
+make iso
+make verify-iso
+```
+
+### Internal boot drive
+
+Use the same `akoya-boot.img` with whole-disk `dd` when imaging a small internal boot device, or expand the image size with `AKOYA_USB_IMAGE_SIZE_MB=128 make usb` if your tooling requires more headroom.
 
 ### Bare-metal Ethernet checklist
 
@@ -278,7 +343,7 @@ If automated ISO packaging is unavailable on your workstation, you can prepare b
 6. Boot from USB; use USB-serial on COM1 and/or the laptop panel for VGA text output.
 7. Confirm console output matches the **Expected console output** section above.
 
-Workstation packages for the automated path: `grub-pc-bin`, `xorriso` (Debian/Ubuntu).
+Workstation packages for the automated path: `grub-pc-bin`, `genext2fs`, `util-linux` (USB/HDD disk image); `grub-pc-bin`, `xorriso` (ISO).
 
 ## OpenSpec Flow
 
