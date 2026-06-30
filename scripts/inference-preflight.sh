@@ -3,7 +3,7 @@
 # Aborts with non-zero exit when the configured chat/inference host is unreachable.
 
 inference_preflight() {
-    local host="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
+    local host="${AKOYA_CHAT_HOST_IP:-192.168.1.2}"
     local port="${AKOYA_CHAT_PORT:-11435}"
     local label="${1:-inference pre-flight}"
 

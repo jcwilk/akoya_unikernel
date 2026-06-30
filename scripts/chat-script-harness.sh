@@ -145,7 +145,7 @@ chat_script_assert_expect_not() {
 
 chat_script_count_reply_lines() {
     local log_file="$1"
-    local host="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
+    local host="${AKOYA_CHAT_HOST_IP:-192.168.1.2}"
 
     awk -v host="${host}" '
         $0 ~ ("^" host " reachable$") { found = 1; next }
@@ -363,7 +363,7 @@ chat_script_execute_interactive_steps() {
 
 chat_script_wait_for_reachability() {
     local log_file="$1"
-    local chat_host="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
+    local chat_host="${AKOYA_CHAT_HOST_IP:-192.168.1.2}"
     local waited=0
 
     while ! grep -Fq "${chat_host} reachable" "${log_file}" && [[ ${waited} -lt 600 ]]; do

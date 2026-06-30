@@ -15,7 +15,7 @@
 #define AKOYA_CHAT_HOST_IP2 1
 #endif
 #ifndef AKOYA_CHAT_HOST_IP3
-#define AKOYA_CHAT_HOST_IP3 110
+#define AKOYA_CHAT_HOST_IP3 2
 #endif
 
 #ifndef AKOYA_CHAT_PATH
@@ -528,8 +528,18 @@ static int http_response_complete(const uint8_t *buf, uint16_t len, void *ctx)
     return ((int)len - hdr_end) >= content_length;
 }
 
+static int json_string_len(const char *json)
+{
+    int n = 0;
+    while (json[n] != '\0') {
+        n++;
+    }
+    return n;
+}
+
 static int build_request(const char *json, int json_len, char *buf, int cap, int *len_out)
 {
+    (void)json_len;
     char host[24];
     format_host_ip(host, (int)sizeof(host));
     if (AKOYA_CHAT_PORT != 80) {
@@ -563,8 +573,13 @@ static int build_request(const char *json, int json_len, char *buf, int cap, int
         host[host_len] = '\0';
     }
 
+    int body_len = json_string_len(json);
+    if (body_len <= 0) {
+        return -1;
+    }
+
     char len_str[8];
-    int len_val = json_len;
+    int len_val = body_len;
     int len_idx = 0;
     if (len_val == 0) {
         len_str[0] = '0';

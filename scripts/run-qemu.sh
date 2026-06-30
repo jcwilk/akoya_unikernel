@@ -12,7 +12,7 @@ source "${AKOYA_PROFILE}"
 QEMU_BIN="${AKOYA_QEMU_BIN:-qemu-system-i386}"
 TIMEOUT_SEC="${AKOYA_QEMU_TIMEOUT_SEC:-300}"
 BOOT_MESSAGE="${AKOYA_BOOTSTRAP_MESSAGE:-akoya_unikernel bootstrap ok}"
-CHAT_HOST="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
+CHAT_HOST="${AKOYA_CHAT_HOST_IP:-192.168.1.2}"
 CHAT_PORT="${AKOYA_CHAT_PORT:-11435}"
 DEFAULT_CHAT_SCRIPT_FILE="${ROOT_DIR}/scripts/fixtures/multi-turn-pong.akoya-script"
 DEFAULT_CHAT_SCRIPT="h i ret w h a t ret q u i t ret"
@@ -64,7 +64,7 @@ Environment:
   AKOYA_QEMU_LAN_IF       Wired interface for macvtap parent (default: enx00e04c6801e8)
   AKOYA_QEMU_GUEST_MAC    Fixed guest MAC (default: 52:54:00:12:34:56)
   AKOYA_QEMU_TIMEOUT_SEC  Headless timeout (default: 300)
-  AKOYA_CHAT_HOST_IP       Chat endpoint host for pre-flight (default: 192.168.1.110)
+  AKOYA_CHAT_HOST_IP       Chat endpoint host for pre-flight (default: 192.168.1.2)
   AKOYA_CHAT_PORT          Chat endpoint port for pre-flight (default: 11435)
   AKOYA_CHAT_SCRIPT        Legacy space-separated sendkey names when AKOYA_USE_KEYBOARD_SCRIPT=1
   AKOYA_USE_KEYBOARD_SCRIPT 1 = use AKOYA_CHAT_SCRIPT instead of default multi-turn *.akoya-script

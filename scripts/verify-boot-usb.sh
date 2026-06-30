@@ -6,7 +6,7 @@ BUILD_DIR="${ROOT_DIR}/build"
 IMG_PATH="${BUILD_DIR}/akoya-boot.img"
 LOG_FILE="${BUILD_DIR}/verify-boot-usb.log"
 BOOT_MESSAGE="${AKOYA_BOOTSTRAP_MESSAGE:-akoya_unikernel bootstrap ok}"
-CHAT_HOST="${AKOYA_CHAT_HOST_IP:-192.168.1.110}"
+CHAT_HOST="${AKOYA_CHAT_HOST_IP:-192.168.1.2}"
 
 usage() {
     cat >&2 <<EOF

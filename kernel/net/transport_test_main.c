@@ -19,7 +19,7 @@
 #define AKOYA_CHAT_HOST_IP2 1
 #endif
 #ifndef AKOYA_CHAT_HOST_IP3
-#define AKOYA_CHAT_HOST_IP3 110
+#define AKOYA_CHAT_HOST_IP3 2
 #endif
 #ifndef AKOYA_CHAT_PORT
 #define AKOYA_CHAT_PORT 11435

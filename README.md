@@ -66,7 +66,7 @@ make clean    # remove build/ artifacts
 
 ### Agent verification entry points
 
-Automated verification **requires** the configured inference endpoint (`AKOYA_CHAT_HOST_IP` / `AKOYA_CHAT_PORT`, default `192.168.1.110:11435`) to be reachable from the workstation. All entry points below abort before starting emulation when pre-flight fails.
+Automated verification **requires** the configured inference endpoint (`AKOYA_CHAT_HOST_IP` / `AKOYA_CHAT_PORT`, default `192.168.1.2:11435`) to be reachable from the workstation. All entry points below abort before starting emulation when pre-flight fails.
 
 | Entry point | Purpose |
 |-------------|---------|
@@ -148,7 +148,7 @@ chat>quit
 chat_session=exit
 ```
 
-When the configured chat endpoint (`192.168.1.110:11435` by default) is unreachable, you may see `chat_completion=fail reason=connect|timeout|http|parse|overflow` instead.
+When the configured chat endpoint (`192.168.1.2:11435` by default) is unreachable, you may see `chat_completion=fail reason=connect|timeout|http|parse|overflow` instead.
 
 ### Interactive chat session
 
@@ -168,7 +168,7 @@ Headless `make test` asserts:
 - `turn N: PASS` for at least three scheduled turns and `timed-gap-chat-regression: ALL PASS`
 - No `chat failed:` lines between successful multi-turn exchanges
 
-**llama.cpp prerequisite:** For full chat-completion acceptance, run a llama.cpp OpenAI-compatible server on the workstation LAN at `http://192.168.1.110:11435/v1/chat/completions`. Headless verification aborts before emulation when the endpoint is unreachable from the workstation.
+**llama.cpp prerequisite:** For full chat-completion acceptance, run a llama.cpp OpenAI-compatible server on the workstation LAN at `http://192.168.1.2:11435/v1/chat/completions`. Headless verification aborts before emulation when the endpoint is unreachable from the workstation.
 
 On failure you may see `net_ip=fail reason=…`, `net_link=fail reason=nic`, `net_ping=… status=fail reason=timeout|unreachable`, or `chat_completion=fail reason=…`.
 
@@ -230,7 +230,7 @@ bash scripts/run-qemu.sh --headless --boot-iso build/akoya-boot.iso
 | `AKOYA_BUILD_MEM_LIMIT_MB` | `4096` | Virtual-memory ceiling for compilation |
 | `AKOYA_CROSS_PREFIX` | `i686-elf-` | Toolchain command prefix (empty → `gcc -m32` fallback) |
 | `AKOYA_PROBE_HOST` | `google.com` | Hostname resolved at build time for ICMP probe (no DNS in guest) |
-| `AKOYA_CHAT_HOST_IP` | `192.168.1.110` | IPv4 address for chat-completion HTTP probe |
+| `AKOYA_CHAT_HOST_IP` | `192.168.1.2` | IPv4 address for chat-completion HTTP probe |
 | `AKOYA_CHAT_PATH` | `/v1/chat/completions` | HTTP path for chat-completion probe |
 | `AKOYA_CHAT_USER_MSG` | `hi` | Legacy build-time default (interactive session uses keyboard input) |
 | `AKOYA_CHAT_MODEL` | `fast-text-qwen3-8b` | Model string in chat-completion JSON body |
@@ -250,7 +250,7 @@ Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `buil
 | `AKOYA_QEMU_TAP_IF` | `akoya-qemu0` | Macvtap interface name |
 | `AKOYA_AUTO_LAN` | `1` | Ephemeral macvtap up/down around each run |
 | `AKOYA_LAN_LIBEXEC` | `/usr/local/libexec/akoya` | Installed macvtap helpers (capability-bound after one-time install) |
-| `AKOYA_CHAT_HOST_IP` | `192.168.1.110` | Chat endpoint host for pre-flight reachability check |
+| `AKOYA_CHAT_HOST_IP` | `192.168.1.2` | Chat endpoint host for pre-flight reachability check |
 | `AKOYA_CHAT_PORT` | `11435` | Chat endpoint port for pre-flight reachability check |
 | `AKOYA_CHAT_SCRIPT` | `h i ret w h a t ret q u i t ret` | Legacy headless sendkey sequence when `AKOYA_USE_KEYBOARD_SCRIPT=1` |
 | `AKOYA_USE_KEYBOARD_SCRIPT` | `0` | `1` selects `AKOYA_CHAT_SCRIPT` instead of the default multi-turn `*.akoya-script` |

@@ -93,6 +93,7 @@ static int runtime_quiescent(void)
 
 int runtime_pump_once(void)
 {
+    device_poll_registered();
     timer_poll();
     runtime_service_devices();
 

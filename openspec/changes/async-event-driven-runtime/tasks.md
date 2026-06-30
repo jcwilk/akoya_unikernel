@@ -10,7 +10,7 @@
 
 - [x] 2.1 Add timer wheel or ordered deadline list using calibrated TSC base; expose schedule/cancel/check APIs
 - [x] 2.2 Route runtime millisecond waits (gaps, DHCP/TCP/chat timeouts) through timer events; restrict `time_delay_ms` to boot calibration and immediate hardware settle per design
-- [ ] 2.3 Unit smoke: scheduled 500 ms gap within 10% under `make test` timed-gap path
+- [x] 2.3 Unit smoke: scheduled 500 ms gap within 10% under `make test` timed-gap path
 
 ## 3. Keyboard (shared device framework)
 
@@ -29,7 +29,7 @@
 - [x] 5.1 Convert DHCP acquisition to resumable state machine driven by event runtime
 - [x] 5.2 Convert ARP resolve and single ICMP connectivity probe to resumable state machines
 - [x] 5.3 Preserve console-visible bootstrap order: link → DHCP → address line → console clear → probe → chat handoff
-- [ ] 5.4 Run headless bootstrap smoke; capture serial log showing unchanged diagnostic sequence
+- [x] 5.4 Run headless bootstrap smoke; capture serial log showing unchanged diagnostic sequence
 
 ## 6. Async chat and transport
 
@@ -40,10 +40,10 @@
 
 ## 7. Validation and documentation
 
-- [ ] 7.0 Update project default configured chat/inference host from `192.168.1.110` to `192.168.1.2` in build scripts, harness defaults, kernel compile-time fallbacks, and README
-- [ ] 7.1 `make test` — timed-gap regression and transport paths pass
-- [ ] 7.2 `make verify-usb` — deploy-faithful boot tier passes
-- [ ] 7.3 Headful manual smoke: three-turn chat without spurious `chat failed: connect` when endpoint reachable; document command and outcome in apply notes
+- [x] 7.0 Update project default configured chat/inference host from `192.168.1.110` to `192.168.1.2` in build scripts, harness defaults, kernel compile-time fallbacks, and README
+- [x] 7.1 `make test` — timed-gap regression and transport paths pass
+- [x] 7.2 `make verify-usb` — deploy-faithful boot tier passes
+- [x] 7.3 Headful manual smoke: three-turn chat without spurious `chat failed: connect` when endpoint reachable; document command and outcome in apply notes
 - [x] 7.4 README: brief note on deferred device bottom-halves (pending → drain → unmask → follow-up poll), shared keyboard/NIC shape, and `hlt` idle; headless automation unchanged
 - [x] 7.5 `npx @fission-ai/openspec@latest validate async-event-driven-runtime --type change`
 

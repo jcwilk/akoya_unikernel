@@ -457,6 +457,7 @@ tcp_status_t tcp_session_send(tcp_session_t *session, const uint8_t *data, uint1
     }
 
     conn_seq += len;
+    tcp_drain_link();
     return TCP_OK;
 }
 
