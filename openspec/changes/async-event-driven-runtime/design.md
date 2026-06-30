@@ -146,6 +146,7 @@ Each loop pass visits, in stable order: **timers** → **keyboard bottom-half (i
 6. Async TCP/HTTP chat turn machine; wire `http_chat_session`.
 7. Update timed-gap regression to schedule gaps via timer events.
 8. Run `make test`, `make verify-usb`, headful multi-turn smoke; fix connect-on-turn-3 class if still present.
+9. Update workstation default inference host to `192.168.1.2` in build/harness/kernel fallbacks before re-running blocked validation.
 
 **Rollback:** Revert branch; prior synchronous stack remains in git history.
 

@@ -33,4 +33,5 @@ The bootstrap unikernel today runs network bootstrap and the interactive chat se
 - **Network**: DHCP, ARP, ICMP probe, TCP, and HTTP chat become state machines; link layer gains demultiplexing or fan-out suitable for concurrent timer and RX events.
 - **Time**: `time_delay_ms` busy-wait replaced or narrowed to boot-time calibration; runtime delays become timer events.
 - **Tests**: `make test`, timed-gap regression, transport-test, and headful smoke must pass with the new runtime; multi-turn chat connect failures observed in headful testing become an explicit acceptance target.
+- **Workstation defaults**: the project default configured chat/inference host moves to `192.168.1.2` (still overridable via environment at build and harness time).
 - **Out of scope this change**: WiFi, touchpad, IRQ-driven optimizations beyond wired NIC + keyboard, SMP, persistent background daemons, changing inference protocol or chat UX.

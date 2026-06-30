@@ -40,6 +40,7 @@
 
 ## 7. Validation and documentation
 
+- [ ] 7.0 Update project default configured chat/inference host from `192.168.1.110` to `192.168.1.2` in build scripts, harness defaults, kernel compile-time fallbacks, and README
 - [ ] 7.1 `make test` — timed-gap regression and transport paths pass
 - [ ] 7.2 `make verify-usb` — deploy-faithful boot tier passes
 - [ ] 7.3 Headful manual smoke: three-turn chat without spurious `chat failed: connect` when endpoint reachable; document command and outcome in apply notes
