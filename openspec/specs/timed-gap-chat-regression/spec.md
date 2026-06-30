@@ -41,7 +41,7 @@ The timed-gap chat regression boot image SHALL exercise the same production inte
 
 ### Requirement: Bounded timed idle between scheduled turns
 
-The timed-gap chat regression boot image SHALL run without operator keyboard input. Between scheduled chat turns it SHALL wait at the input prompt using bounded timed blocking for a configured duration rather than waiting for human typing, mimicking operator pacing and headful idle-at-prompt conditions where no keyboard input occurs during the gap.
+The timed-gap chat regression boot image SHALL run without operator keyboard input. Between scheduled chat turns it SHALL wait at the input prompt using bounded timed blocking for a configured duration rather than waiting for human typing, mimicking operator pacing and headful idle-at-prompt conditions where no keyboard input occurs during the gap. The wait SHALL use guest millisecond timing that reflects the configured duration on deployment hardware and on CPU-faithful emulation within the tolerance defined by the guest-timekeeping capability.
 
 #### Scenario: Timed gap at input prompt
 
@@ -50,6 +50,7 @@ The timed-gap chat regression boot image SHALL run without operator keyboard inp
 - **THEN** the image waits for a bounded configured duration at the input prompt without keyboard input
 - **AND** outbound transport remains fully inactive throughout the timed idle gap
 - **AND** the next scheduled turn begins only after the timed wait completes
+- **AND** the elapsed gap is within ten percent of the configured duration on deployment CPU or CPU-faithful emulation
 
 #### Scenario: No keyboard dependency between turns
 
