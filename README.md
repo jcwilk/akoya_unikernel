@@ -70,6 +70,8 @@ Automated verification **requires** the configured inference endpoint (`AKOYA_CH
 
 | Entry point | Purpose |
 |-------------|---------|
+| `make test` / `scripts/run-chat-regression-test.sh` | **Fast tier:** direct multiboot timed-gap chat regression (required for merge confidence) |
+| `make verify-usb` / `scripts/verify-boot-usb.sh` | **Deploy tier:** BIOS/GRUB USB disk boot smoke (required for pre-flash sign-off alongside `make test`) |
 | `bash scripts/build-boot-iso.sh` / `make iso` | Package `build/akoya-boot.iso` (Multiboot1 + GRUB, BIOS/Legacy) |
 | `bash scripts/verify-boot-iso.sh` / `make verify-iso` | Boot packaged ISO under QEMU; pass on bootstrap + connectivity probe (no inference pre-flight) |
 | `bash scripts/run-chat-regression-test.sh` | Build (if needed), run `chat-regression-test` image headlessly, exit 0 on `timed-gap-chat-regression: ALL PASS` (default `make test` gate) |
@@ -81,6 +83,8 @@ Automated verification **requires** the configured inference endpoint (`AKOYA_CH
 | `bash scripts/run-qemu.sh --headless --image build/transport-test.elf` | Explicit transport-test image selection when both images exist |
 
 `make verify-iso` and `run-qemu.sh --boot-iso` **do not** require the inference endpoint to be reachable from the workstation. `make test`, timed-gap chat regression, and default headless kernel runs require inference pre-flight.
+
+**Pre-flash sign-off** on a workstation with packaging tools installed requires **both** `make test` (fast direct-multiboot regression) **and** `make verify-usb` (deploy-faithful disk boot through BIOS → GRUB). Either tier alone is insufficient for flashing removable media to the Akoya.
 
 When multiple logical images exist under `build/`, omit `--image` / `--logical` and the runner errors with an actionable list—use `--logical kernel`, `--logical transport-test`, or `--logical chat-regression-test`.
 
@@ -240,6 +244,18 @@ Successful builds print an `AKOYA_BUILD_RESULT=...` summary line and write `buil
 | `AKOYA_CHAT_SCRIPT` | `h i ret w h a t ret q u i t ret` | Legacy headless sendkey sequence when `AKOYA_USE_KEYBOARD_SCRIPT=1` |
 | `AKOYA_USE_KEYBOARD_SCRIPT` | `0` | `1` selects `AKOYA_CHAT_SCRIPT` instead of the default multi-turn `*.akoya-script` |
 | `AKOYA_SKIP_INFERENCE_PREFLIGHT` | `0` | `1` skips chat-endpoint pre-flight (set by `verify-boot-iso.sh` / `--boot-iso` smoke) |
+| `AKOYA_QEMU_CPU` | (from `target/akoya.profile` `AKOYA_CPU_CLASS`, default `qemu32` for `pentium-m`) | Override QEMU `-cpu` model for experiments |
+
+### Emulation vs deployment hardware
+
+| Area | QEMU harness | Deployment unit | Notes |
+|------|--------------|-----------------|-------|
+| CPU | Profile-driven (`pentium-m` → `qemu32` by default) | Pentium M 735 | Override with `AKOYA_QEMU_CPU` |
+| RAM | 512 MiB (`-m 512`) | ~2 GiB | **Intentionally reduced** for emulation; profile documents full RAM |
+| Boot (fast tier) | Direct multiboot `-kernel` | Insyde BIOS → GRUB on USB | Use `make verify-usb` for boot-chain parity |
+| Console | VGA text (`-vga std` headful) + COM1 serial | Same early path | Serial headless capture **preserved** for automation |
+| Display clear | Post-network `console_clear` unchanged | Same | Not modified by this harness |
+| NIC | RTL8139 emulation | RTL8139 rev 10 at 01:02.0 | Driver uses polling RX (IRQ 11 not modeled in QEMU) |
 
 ## Bare-metal boot
 

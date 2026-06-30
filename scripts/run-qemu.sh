@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${ROOT_DIR}/build"
 LOG_FILE="${BUILD_DIR}/qemu-smoke.log"
+AKOYA_PROFILE="${ROOT_DIR}/target/akoya.profile"
+
+# shellcheck source=target/akoya.profile
+source "${AKOYA_PROFILE}"
 
 QEMU_BIN="${AKOYA_QEMU_BIN:-qemu-system-i386}"
 TIMEOUT_SEC="${AKOYA_QEMU_TIMEOUT_SEC:-300}"
@@ -67,6 +71,7 @@ Environment:
   AKOYA_AUTO_LAN          1 = macvtap up/down around each run (default: 1)
   AKOYA_LAN_LIBEXEC       Installed helper scripts with CAP_NET_ADMIN (default: /usr/local/libexec/akoya)
   AKOYA_SKIP_INFERENCE_PREFLIGHT  1 = skip chat-endpoint pre-flight (ISO smoke / verify-boot-iso)
+  AKOYA_QEMU_CPU                  Override QEMU -cpu model (default from AKOYA_CPU_CLASS in target/akoya.profile)
 
 ISO boot (--boot-iso) uses BIOS/Legacy optical media. Disk boot (--boot-disk) uses -hda
 (boot order c) for akoya-boot.img from make usb. Both skip inference pre-flight in
@@ -541,6 +546,29 @@ image_is_chat_regression_test() {
     [[ "$(basename "${image_path}")" == chat-regression-test.bin || "$(basename "${image_path}")" == chat-regression-test.elf ]]
 }
 
+resolve_qemu_cpu() {
+    if [[ -n "${AKOYA_QEMU_CPU:-}" ]]; then
+        echo "${AKOYA_QEMU_CPU}"
+        return 0
+    fi
+
+    case "${AKOYA_CPU_CLASS:-}" in
+        pentium-m|pentium_m)
+            # Closest faithful 32-bit model on typical QEMU (qemu-system-i386 -cpu help).
+            echo "qemu32"
+            ;;
+        pentium3)
+            echo "pentium3"
+            ;;
+        pentium|pentium2)
+            echo "${AKOYA_CPU_CLASS}"
+            ;;
+        *)
+            echo "qemu32"
+            ;;
+    esac
+}
+
 main() {
     mkdir -p "${BUILD_DIR}"
 
@@ -562,10 +590,15 @@ main() {
 
     : > "${LOG_FILE}"
 
+    local qemu_cpu
+    qemu_cpu="$(resolve_qemu_cpu)"
+
     local display_args=(-display none)
+    local vga_args=()
     local run_timeout=("${TIMEOUT_SEC}")
     if [[ "${MODE}" == "headful" ]]; then
         display_args=(-display sdl)
+        vga_args=(-vga std)
         if [[ "${EXIT_ON_GUEST_DONE}" -eq 0 ]]; then
             echo "Running QEMU headfully (SDL keyboard uses emulated i8042 PS/2 path; close window or Ctrl+C when done)" | tee -a "${LOG_FILE}"
         else
@@ -596,6 +629,7 @@ main() {
         echo "Boot image: ${kernel_image}" | tee -a "${LOG_FILE}"
     fi
     echo "LAN: macvtap ${MACVTAP_IF} on ${LAN_IF}, guest MAC: ${GUEST_MAC}" | tee -a "${LOG_FILE}"
+    echo "QEMU CPU: ${qemu_cpu} (profile class: ${AKOYA_CPU_CLASS:-unset})" | tee -a "${LOG_FILE}"
 
     # shellcheck disable=SC1090
     source "${STATE_FILE}"
@@ -613,9 +647,10 @@ main() {
 
     local -a qemu_args=(
         -m 512
-        -cpu pentium3
+        -cpu "${qemu_cpu}"
         -smp 1
         "${display_args[@]}"
+        "${vga_args[@]}"
         -serial stdio
         -no-reboot
         -netdev "tap,fd=3,id=net0"

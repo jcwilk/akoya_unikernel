@@ -173,3 +173,113 @@ market:
   sources:
     - bestbuy_medion_akoya_ex_specifications.md
     - ryanbetz-notebookreview-review-2009-03-01.md
+
+# Direct observation of the deployment unit (2026-06-29 batch).
+# Supersedes marketing sources where more precise; see target/akoya_ex/README.md index row.
+observed_on_deployment_unit:
+  cpu:
+    model: Intel Pentium M 735
+    marketing_name: Intel(R) Pentium(R) M processor 1.70GHz
+    family: 6
+    model_id: 13
+    stepping: 6
+    cores: 1
+    threads_per_core: 1
+    clock_mhz_max: 1700
+    clock_mhz_min: 600
+    l2_cache_kb: 2048
+    simd: sse2
+    sources:
+      - raw_inspection_logs/lscpu.txt
+      - raw_inspection_logs/proc_cpuinfo_flags.txt
+
+  chipset:
+    host_bridge: Intel 82852/82855 GM/GME/PM/GMV Processor to I/O Controller (8086:3580 rev 02)
+    integrated_graphics: Intel 82852/855GM Integrated Graphics Device (8086:3582 rev 02)
+    lpc_bridge: Intel 82801DBM (ICH4-M) LPC Interface Bridge (8086:24cc rev 03)
+    ide_controller: Intel 82801DBM (ICH4-M) IDE Controller (8086:24ca rev 03)
+    sources:
+      - raw_inspection_logs/lspci_nnv.txt
+
+  memory:
+    mem_total_kb: 2019920
+    approximate_installed_mb: 1973
+    sources:
+      - raw_inspection_logs/meminfo.txt
+
+  pci:
+    wired_nic:
+      bdf: "01:02.0"
+      vendor_device: "10ec:8139"
+      revision: 10
+      subsystem: "1071:8011"
+      irq: 11
+      io_bar: "0xc100"
+      mem_bar: "0xe0000800"
+      driver: 8139too
+      mac: "00:40:d0:6f:2c:74"
+      interface: enp1s2
+      link: "100Mbps full-duplex"
+      sources:
+        - raw_inspection_logs/lspci_nnv_enp1s2.txt
+        - raw_inspection_logs/lspci_xxx_01_02.0.txt
+        - raw_inspection_logs/setpci_01_02.0.txt
+        - raw_inspection_logs/dmesg_net_pci.txt
+    wireless:
+      bdf: "01:01.0"
+      vendor_device: "8086:4220"
+      revision: 5
+      subsystem: "8086:2701"
+      product: Intel PRO/Wireless 2200BG
+      irq: 11
+      sources:
+        - raw_inspection_logs/wifi_lspci_wifi.txt
+
+  network:
+    wired:
+      adapter: Realtek RTL8139 (rev 10)
+      speed: 100Mbps
+      sources:
+        - raw_inspection_logs/lspci_nnv_enp1s2.txt
+        - raw_inspection_logs/dmesg_net_pci.txt
+    wireless:
+      adapter: Intel PRO/Wireless 2200BG
+      sources:
+        - raw_inspection_logs/wifi_lspci_wifi.txt
+
+  bios:
+    vendor: Insyde Software Corporation
+    version: M1.02
+    release_date: "03/09/2005"
+    smbios_version: "2.3"
+    sources:
+      - raw_inspection_logs/dmidecode_bios.txt
+
+  display:
+    framebuffer: i915drmfb
+    resolution: 1280x768
+    bits_per_pixel: 32
+    sources:
+      - raw_inspection_logs/fb_info.txt
+
+  input:
+    keyboard: AT Translated Set 2 keyboard (i8042 serio0)
+    touchpad: SynPS/2 Synaptics TouchPad (i8042 serio3)
+    sources:
+      - raw_inspection_logs/input_devices.txt
+      - raw_inspection_logs/dmesg_i8042_ps2.txt
+
+  storage:
+    boot_media_observed:
+      - class: usb_flash
+        device: /dev/sda
+        size_gb: 14.5
+        model: FlashBlu
+        fstype: vfat
+    optical:
+      device: /dev/sr0
+      model: MATSHITADVD-RAM UJ-840S
+    ide_class: Intel ICH4-M PATA (8086:24ca)
+    sources:
+      - raw_inspection_logs/lsblk_detail.txt
+      - raw_inspection_logs/lspci_nnv_ide_00_1f.1.txt
