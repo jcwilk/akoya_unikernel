@@ -1,5 +1,5 @@
 #include "console/console.h"
-#include "net/chat_regression_main.h"
+#include "net/net_async.h"
 
 #define AKOYA_BOOTSTRAP_MESSAGE "akoya_unikernel bootstrap ok"
 
@@ -14,7 +14,7 @@ void kernel_main(void)
     console_write("build_id=");
     console_write_line(AKOYA_BUILD_ID);
 
-    chat_regression_run();
+    chat_regression_async_start();
 
     __asm__ volatile ("outb %%al, $0xf4" : : "a"((unsigned char)0));
 

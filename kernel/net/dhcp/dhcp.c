@@ -339,3 +339,100 @@ dhcp_status_t dhcp_acquire(ipv4_config_t *config_out, uint32_t timeout_ms)
     *config_out = offered_config;
     return DHCP_OK;
 }
+
+void dhcp_sm_begin(dhcp_sm_t *sm, uint32_t timeout_ms)
+{
+    offer_received = 0;
+    ack_received = 0;
+    dhcp_server_id.bytes[0] = 0;
+    dhcp_server_id.bytes[1] = 0;
+    dhcp_server_id.bytes[2] = 0;
+    dhcp_server_id.bytes[3] = 0;
+    transaction_id = (uint32_t)(time_millis() | 0x01000000U);
+
+    sm->config.address.bytes[0] = 0;
+    sm->config.address.bytes[1] = 0;
+    sm->config.address.bytes[2] = 0;
+    sm->config.address.bytes[3] = 0;
+    sm->config.subnet = sm->config.address;
+    sm->config.gateway = sm->config.address;
+
+    sm->active = 1;
+    sm->phase = 0;
+    sm->deadline_ms = time_millis() + timeout_ms;
+    sm->poll_until_ms = 0;
+    sm->result = DHCP_OK;
+
+    link_register_ipv4_handler(dhcp_ipv4_handler, 0);
+}
+
+int dhcp_sm_done(const dhcp_sm_t *sm)
+{
+    return !sm->active;
+}
+
+dhcp_status_t dhcp_sm_result(const dhcp_sm_t *sm)
+{
+    return sm->result;
+}
+
+const ipv4_config_t *dhcp_sm_config(const dhcp_sm_t *sm)
+{
+    return &sm->config;
+}
+
+int dhcp_sm_step(dhcp_sm_t *sm)
+{
+    if (!sm->active) {
+        return 1;
+    }
+
+    uint32_t now = time_millis();
+    if (now >= sm->deadline_ms) {
+        sm->result = sm->phase < 2 ? DHCP_FAIL_NO_OFFER : DHCP_FAIL_NO_ACK;
+        link_unregister_ipv4_handler(dhcp_ipv4_handler, 0);
+        sm->active = 0;
+        return 1;
+    }
+
+    if (sm->phase == 0) {
+        if (now >= sm->poll_until_ms) {
+            if (send_dhcp(1, sm->config.address) != 0) {
+                sm->result = DHCP_FAIL_TIMEOUT;
+                link_unregister_ipv4_handler(dhcp_ipv4_handler, 0);
+                sm->active = 0;
+                return 1;
+            }
+            sm->poll_until_ms = now + 1000U;
+        }
+        if (offer_received) {
+            sm->phase = 1;
+            ack_received = 0;
+            sm->poll_until_ms = 0;
+        }
+        return 0;
+    }
+
+    if (sm->phase == 1) {
+        if (now >= sm->poll_until_ms) {
+            if (send_dhcp(3, offered_config.address) != 0) {
+                sm->result = DHCP_FAIL_TIMEOUT;
+                link_unregister_ipv4_handler(dhcp_ipv4_handler, 0);
+                sm->active = 0;
+                return 1;
+            }
+            sm->poll_until_ms = now + 1000U;
+        }
+        if (ack_received) {
+            sm->config = offered_config;
+            sm->result = DHCP_OK;
+            link_unregister_ipv4_handler(dhcp_ipv4_handler, 0);
+            sm->active = 0;
+            return 1;
+        }
+        return 0;
+    }
+
+    sm->active = 0;
+    return 1;
+}

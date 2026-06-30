@@ -40,4 +40,8 @@ void http_chat_emit_fail(const char *reason);
 
 void http_chat_session(void);
 
+int http_chat_build_turn_request(const http_chat_history_t *history, char *buf, int cap, int *len_out);
+int http_chat_response_complete(const uint8_t *buf, uint16_t len);
+http_chat_status_t http_chat_parse_turn_response(const uint8_t *response, uint16_t len, char *reply, int reply_cap);
+
 #endif

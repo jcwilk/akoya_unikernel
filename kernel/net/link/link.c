@@ -26,15 +26,20 @@ struct arp_packet {
     ipv4_addr_t target_ip;
 } __attribute__((packed));
 
+#define ARP_CACHE_SIZE 4
+#define IPV4_HANDLER_MAX 8
+
+static struct {
+    link_ipv4_handler_t handler;
+    void *ctx;
+    int active;
+} ipv4_handlers[IPV4_HANDLER_MAX];
+
 static eth_device_t *nic;
-static link_ipv4_handler_t ipv4_handler;
-static void *ipv4_ctx;
 static link_arp_handler_t arp_handler;
 static void *arp_ctx;
 
 static eth_addr_t broadcast_mac = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
-
-#define ARP_CACHE_SIZE 4
 
 static struct {
     ipv4_addr_t ip;
@@ -147,8 +152,10 @@ static void handle_ipv4(const uint8_t *frame, uint16_t length)
     src_ip.bytes[3] = ip[15];
     arp_cache_store(src_ip, hdr->src);
 
-    if (ipv4_handler != 0) {
-        ipv4_handler(ip, (uint16_t)(length - sizeof(struct eth_header)), ipv4_ctx);
+    for (int i = 0; i < IPV4_HANDLER_MAX; i++) {
+        if (ipv4_handlers[i].active && ipv4_handlers[i].handler != 0) {
+            ipv4_handlers[i].handler(ip, (uint16_t)(length - sizeof(struct eth_header)), ipv4_handlers[i].ctx);
+        }
     }
 }
 
@@ -197,8 +204,11 @@ eth_device_t *link_device(void)
 void link_init(eth_device_t *dev)
 {
     nic = dev;
-    ipv4_handler = 0;
-    ipv4_ctx = 0;
+    for (int i = 0; i < IPV4_HANDLER_MAX; i++) {
+        ipv4_handlers[i].active = 0;
+        ipv4_handlers[i].handler = 0;
+        ipv4_handlers[i].ctx = 0;
+    }
     arp_handler = 0;
     arp_ctx = 0;
     for (int i = 0; i < ARP_CACHE_SIZE; i++) {
@@ -322,10 +332,121 @@ int link_resolve_ipv4(ipv4_addr_t dest_ip, eth_addr_t *mac_out, uint32_t timeout
     return -1;
 }
 
+static void arp_sm_handler(const uint8_t *packet, uint16_t length, void *ctx)
+{
+    (void)length;
+    arp_sm_t *sm = (arp_sm_t *)ctx;
+    const struct arp_packet *arp = (const struct arp_packet *)packet;
+
+    if (net_be16(arp->operation) != 2) {
+        return;
+    }
+
+    if (!ipv4_equal(arp->sender_ip, sm->target)) {
+        return;
+    }
+
+    sm->mac = arp->sender_mac;
+    sm->found = 1;
+}
+
+void arp_sm_begin(arp_sm_t *sm, ipv4_addr_t target, uint32_t timeout_ms)
+{
+    sm->active = 1;
+    sm->target = target;
+    sm->deadline_ms = time_millis() + timeout_ms;
+    sm->poll_until_ms = 0;
+    sm->found = 0;
+    sm->mac = (eth_addr_t){{0, 0, 0, 0, 0, 0}};
+
+    if (arp_cache_lookup(target, &sm->mac) == 0) {
+        sm->found = 1;
+        sm->active = 0;
+        return;
+    }
+
+    link_register_arp_handler(arp_sm_handler, sm);
+}
+
+int arp_sm_done(const arp_sm_t *sm)
+{
+    return !sm->active;
+}
+
+int arp_sm_found(const arp_sm_t *sm)
+{
+    return sm->found;
+}
+
+eth_addr_t arp_sm_mac(const arp_sm_t *sm)
+{
+    return sm->mac;
+}
+
+int arp_sm_step(arp_sm_t *sm)
+{
+    if (!sm->active) {
+        return 1;
+    }
+
+    uint32_t now = time_millis();
+    if (now >= sm->deadline_ms) {
+        link_register_arp_handler(0, 0);
+        sm->active = 0;
+        return 1;
+    }
+
+    if (sm->found) {
+        link_register_arp_handler(0, 0);
+        sm->active = 0;
+        return 1;
+    }
+
+    if (now >= sm->poll_until_ms) {
+        if (link_send_arp_request(sm->target) != 0) {
+            link_register_arp_handler(0, 0);
+            sm->active = 0;
+            return 1;
+        }
+        sm->poll_until_ms = now + 500U;
+    }
+
+    return 0;
+}
+
 void link_register_ipv4_handler(link_ipv4_handler_t handler, void *ctx)
 {
-    ipv4_handler = handler;
-    ipv4_ctx = ctx;
+    if (handler == 0) {
+        for (int i = 0; i < IPV4_HANDLER_MAX; i++) {
+            ipv4_handlers[i].active = 0;
+            ipv4_handlers[i].handler = 0;
+            ipv4_handlers[i].ctx = 0;
+        }
+        return;
+    }
+
+    for (int i = 0; i < IPV4_HANDLER_MAX; i++) {
+        if (!ipv4_handlers[i].active) {
+            ipv4_handlers[i].handler = handler;
+            ipv4_handlers[i].ctx = ctx;
+            ipv4_handlers[i].active = 1;
+            return;
+        }
+    }
+}
+
+void link_unregister_ipv4_handler(link_ipv4_handler_t handler, void *ctx)
+{
+    for (int i = 0; i < IPV4_HANDLER_MAX; i++) {
+        if (ipv4_handlers[i].active
+            && ipv4_handlers[i].handler == handler
+            && ipv4_handlers[i].ctx == ctx) {
+            ipv4_handlers[i].active = 0;
+            ipv4_handlers[i].handler = 0;
+            ipv4_handlers[i].ctx = 0;
+            return;
+        }
+    }
 }
 
 void link_register_arp_handler(link_arp_handler_t handler, void *ctx)

@@ -561,3 +561,284 @@ void tcp_session_close(tcp_session_t *session)
         session->open = 0;
     }
 }
+
+void tcp_sm_init(tcp_sm_t *sm)
+{
+    sm->state = TCP_SM_IDLE;
+    sm->result = TCP_OK;
+    sm->session.open = 0;
+    sm->chat_drain = 0;
+    sm->open_syn_sent = 0;
+}
+
+void tcp_sm_begin_drain(tcp_sm_t *sm, uint32_t timeout_ms, int chat_drain)
+{
+    sm->state = TCP_SM_DRAIN;
+    sm->deadline_ms = time_millis() + timeout_ms;
+    sm->chat_drain = chat_drain;
+    sm->result = TCP_OK;
+}
+
+void tcp_sm_begin_open(tcp_sm_t *sm, ipv4_addr_t dest, uint16_t port, uint32_t timeout_ms)
+{
+    sm->state = TCP_SM_OPEN;
+    sm->dest = dest;
+    sm->dest_port = port;
+    sm->deadline_ms = time_millis() + timeout_ms;
+    sm->session.open = 0;
+    sm->open_syn_sent = 0;
+    sm->result = TCP_OK;
+}
+
+void tcp_sm_begin_send(tcp_sm_t *sm, const uint8_t *data, uint16_t len)
+{
+    sm->state = TCP_SM_SEND;
+    sm->send_data = data;
+    sm->send_len = len;
+    sm->result = TCP_OK;
+}
+
+void tcp_sm_begin_recv(
+    tcp_sm_t *sm,
+    uint8_t *buf,
+    uint16_t cap,
+    tcp_recv_complete_fn complete,
+    void *ctx,
+    uint32_t timeout_ms)
+{
+    sm->state = TCP_SM_RECV;
+    sm->recv_buf = buf;
+    sm->recv_cap = cap;
+    sm->recv_len = 0;
+    sm->recv_complete = complete;
+    sm->recv_ctx = ctx;
+    sm->body_complete = 0;
+    sm->deadline_ms = time_millis() + timeout_ms;
+    sm->result = TCP_OK;
+}
+
+void tcp_sm_begin_close(tcp_sm_t *sm)
+{
+    sm->state = TCP_SM_CLOSE;
+    sm->deadline_ms = time_millis() + TCP_CLOSE_DRAIN_MS;
+}
+
+int tcp_sm_finished(const tcp_sm_t *sm)
+{
+    return sm->state == TCP_SM_DONE;
+}
+
+tcp_status_t tcp_sm_result(const tcp_sm_t *sm)
+{
+    return sm->result;
+}
+
+uint16_t tcp_sm_recv_len(const tcp_sm_t *sm)
+{
+    return sm->recv_len;
+}
+
+int tcp_sm_step(tcp_sm_t *sm)
+{
+    if (sm->state == TCP_SM_IDLE || sm->state == TCP_SM_DONE) {
+        return 1;
+    }
+
+    if (time_millis() >= sm->deadline_ms
+        && sm->state != TCP_SM_DRAIN
+        && sm->state != TCP_SM_POST_DRAIN
+        && sm->state != TCP_SM_CLOSE) {
+        sm->result = TCP_FAIL_TIMEOUT;
+        sm->state = TCP_SM_DONE;
+        return 1;
+    }
+
+    switch (sm->state) {
+    case TCP_SM_DRAIN: {
+        int inactive = sm->chat_drain
+            ? tcp_chat_drain_until_inactive(1U)
+            : tcp_drain_until_inactive(1U);
+        if (inactive) {
+            sm->state = TCP_SM_DONE;
+            return 1;
+        }
+        if (time_millis() >= sm->deadline_ms) {
+            sm->result = TCP_FAIL_RECV;
+            sm->state = TCP_SM_DONE;
+            return 1;
+        }
+        return 0;
+    }
+    case TCP_SM_OPEN: {
+        if (!sm->open_syn_sent) {
+            conn_remote_ip = sm->dest;
+            conn_remote_port = sm->dest_port;
+            conn_local_port = tcp_alloc_local_port();
+            conn_seq = time_millis();
+            conn_ack = 0;
+            conn_established = 0;
+            conn_remote_fin = 0;
+            conn_our_fin_sent = 0;
+            conn_reset = 0;
+            recv_buf = 0;
+            recv_cap = 0;
+            recv_len = 0;
+
+            link_drain_rx(0);
+            tcp_register_handler();
+
+            if (tcp_send_segment(TCP_FLAG_SYN, 0, 0) != 0) {
+                sm->result = TCP_FAIL_CONNECT;
+                tcp_unregister_handler();
+                tcp_reset_flow_state();
+                sm->state = TCP_SM_POST_DRAIN;
+                sm->deadline_ms = time_millis() + TCP_CLOSE_DRAIN_MS;
+                sm->chat_drain = 1;
+                return 0;
+            }
+            conn_seq++;
+            sm->open_syn_sent = 1;
+            return 0;
+        }
+
+        if (conn_reset) {
+            sm->result = TCP_FAIL_CONNECT;
+            tcp_unregister_handler();
+            tcp_reset_flow_state();
+            sm->state = TCP_SM_POST_DRAIN;
+            sm->deadline_ms = time_millis() + TCP_CLOSE_DRAIN_MS;
+            sm->chat_drain = 1;
+            return 0;
+        }
+
+        if (!conn_established) {
+            if (time_millis() >= sm->deadline_ms) {
+                sm->result = TCP_FAIL_TIMEOUT;
+                tcp_unregister_handler();
+                tcp_reset_flow_state();
+                sm->state = TCP_SM_POST_DRAIN;
+                sm->deadline_ms = time_millis() + TCP_CLOSE_DRAIN_MS;
+                sm->chat_drain = 1;
+            }
+            return 0;
+        }
+
+        if (tcp_send_segment(TCP_FLAG_ACK, 0, 0) != 0) {
+            sm->result = TCP_FAIL_SEND;
+            tcp_unregister_handler();
+            tcp_reset_flow_state();
+            sm->state = TCP_SM_DONE;
+            return 1;
+        }
+
+        sm->session.open = 1;
+        sm->state = TCP_SM_DONE;
+        return 1;
+    }
+    case TCP_SM_SEND: {
+        tcp_status_t st = tcp_session_send(&sm->session, sm->send_data, sm->send_len);
+        if (st != TCP_OK) {
+            sm->result = st;
+            sm->state = TCP_SM_DONE;
+            return 1;
+        }
+        sm->state = TCP_SM_DONE;
+        return 1;
+    }
+    case TCP_SM_RECV: {
+        if (sm->recv_buf != 0 && recv_buf == 0) {
+            tcp_begin_recv(sm->recv_buf, sm->recv_cap, &sm->recv_len);
+        }
+
+        if (conn_reset) {
+            sm->result = TCP_FAIL_RECV;
+            tcp_end_recv();
+            sm->session.open = 0;
+            tcp_transport_release();
+            sm->state = TCP_SM_DONE;
+            return 1;
+        }
+
+        if (!sm->body_complete && sm->recv_complete != 0
+            && sm->recv_complete(sm->recv_buf, recv_len, sm->recv_ctx)) {
+            sm->body_complete = 1;
+            sm->body_complete_deadline = time_millis() + TCP_POST_BODY_DRAIN_MS;
+            sm->recv_len = recv_len;
+            tcp_end_recv();
+        }
+
+        if (sm->body_complete) {
+            if (conn_remote_fin || conn_reset || time_millis() >= sm->body_complete_deadline) {
+                sm->state = TCP_SM_DONE;
+                return 1;
+            }
+            return 0;
+        }
+
+        if (conn_remote_fin) {
+            sm->recv_len = recv_len;
+            tcp_end_recv();
+            sm->session.open = 0;
+            sm->state = TCP_SM_DONE;
+            return 1;
+        }
+
+        if (time_millis() >= sm->deadline_ms) {
+            sm->result = TCP_FAIL_TIMEOUT;
+            tcp_end_recv();
+            sm->state = TCP_SM_DONE;
+            return 1;
+        }
+        return 0;
+    }
+    case TCP_SM_CLOSE: {
+        if (sm->session.open || conn_established) {
+            if (!conn_our_fin_sent) {
+                (void)tcp_send_segment((uint8_t)(TCP_FLAG_FIN | TCP_FLAG_ACK), 0, 0);
+                conn_seq++;
+                conn_our_fin_sent = 1;
+            }
+            if (conn_reset || (conn_our_fin_sent && conn_remote_fin)) {
+                tcp_transport_release();
+                sm->session.open = 0;
+                sm->state = TCP_SM_POST_DRAIN;
+                sm->deadline_ms = time_millis() + TCP_CLOSE_DRAIN_MS;
+                sm->chat_drain = 1;
+                return 0;
+            }
+            if (time_millis() >= sm->deadline_ms) {
+                if (conn_established && !conn_reset) {
+                    (void)tcp_send_segment(TCP_FLAG_RST | TCP_FLAG_ACK, 0, 0);
+                }
+                tcp_transport_release();
+                sm->session.open = 0;
+                sm->state = TCP_SM_POST_DRAIN;
+                sm->deadline_ms = time_millis() + TCP_CLOSE_DRAIN_MS;
+                sm->chat_drain = 1;
+            }
+            return 0;
+        }
+        sm->state = TCP_SM_POST_DRAIN;
+        sm->deadline_ms = time_millis() + TCP_CLOSE_DRAIN_MS;
+        sm->chat_drain = 1;
+        return 0;
+    }
+    case TCP_SM_POST_DRAIN: {
+        int inactive = sm->chat_drain
+            ? tcp_chat_drain_until_inactive(1U)
+            : tcp_drain_until_inactive(1U);
+        if (inactive) {
+            sm->state = TCP_SM_DONE;
+            return 1;
+        }
+        if (time_millis() >= sm->deadline_ms) {
+            sm->state = TCP_SM_DONE;
+            return 1;
+        }
+        return 0;
+    }
+    default:
+        sm->state = TCP_SM_DONE;
+        return 1;
+    }
+}

@@ -194,11 +194,18 @@ main() {
 
     local shared_sources=(
         "${ROOT_DIR}/kernel/boot/entry.S"
+        "${ROOT_DIR}/kernel/arch/isr.S"
+        "${ROOT_DIR}/kernel/arch/idt.c"
+        "${ROOT_DIR}/kernel/arch/pic.c"
         "${ROOT_DIR}/kernel/console/console.c"
+        "${ROOT_DIR}/kernel/event/device.c"
+        "${ROOT_DIR}/kernel/event/runtime.c"
         "${ROOT_DIR}/kernel/pci/pci.c"
         "${ROOT_DIR}/kernel/time/time.c"
+        "${ROOT_DIR}/kernel/time/timer.c"
         "${ROOT_DIR}/kernel/net/eth/eth.c"
         "${ROOT_DIR}/kernel/net/eth/rtl8139.c"
+        "${ROOT_DIR}/kernel/net/eth/nic_device.c"
         "${ROOT_DIR}/kernel/net/link/link.c"
         "${ROOT_DIR}/kernel/net/ipv4/ipv4.c"
         "${ROOT_DIR}/kernel/net/dhcp/dhcp.c"
@@ -210,7 +217,7 @@ main() {
         "${ROOT_DIR}/kernel/input/ps2_keyboard.c"
         "${ROOT_DIR}/kernel/input/ps2_readline.c"
         "${ROOT_DIR}/kernel/net/http/http_chat.c"
-        "${ROOT_DIR}/kernel/net/netmain.c"
+        "${ROOT_DIR}/kernel/net/net_async.c"
         "${ROOT_DIR}/kernel/main.c"
     )
 
@@ -220,8 +227,8 @@ main() {
     )
 
     local chat_regression_only_sources=(
-        "${ROOT_DIR}/kernel/net/chat_regression_main.c"
         "${ROOT_DIR}/kernel/net/http/http_chat.c"
+        "${ROOT_DIR}/kernel/net/net_async.c"
         "${ROOT_DIR}/kernel/input/ps2_keyboard.c"
         "${ROOT_DIR}/kernel/input/ps2_readline.c"
         "${ROOT_DIR}/kernel/chat_regression_entry.c"

@@ -751,6 +751,46 @@ http_chat_status_t http_chat_run_turn(http_chat_history_t *history, char *reply,
     return status;
 }
 
+int http_chat_build_turn_request(const http_chat_history_t *history, char *buf, int cap, int *len_out)
+{
+    static char json[CHAT_JSON_BUDGET];
+    int json_len = build_messages_json(history, json, (int)sizeof(json));
+    if (json_len < 0) {
+        return -1;
+    }
+    return build_request(json, json_len, buf, cap, len_out);
+}
+
+int http_chat_response_complete(const uint8_t *buf, uint16_t len)
+{
+    return http_response_complete(buf, len, 0);
+}
+
+http_chat_status_t http_chat_parse_turn_response(const uint8_t *response, uint16_t len, char *reply, int reply_cap)
+{
+    if (len == 0) {
+        return HTTP_CHAT_FAIL_HTTP;
+    }
+
+    int http_status = 0;
+    if (parse_http_status((const char *)response, (int)len, &http_status) != 0
+        || http_status < 200 || http_status >= 300) {
+        return HTTP_CHAT_FAIL_HTTP;
+    }
+
+    int body_start = body_offset((const char *)response, (int)len);
+    if (body_start < 0 || body_start >= (int)len) {
+        return HTTP_CHAT_FAIL_PARSE;
+    }
+
+    int body_len = (int)len - body_start;
+    if (extract_json_content((const char *)response + body_start, body_len, reply, reply_cap) < 0) {
+        return HTTP_CHAT_FAIL_PARSE;
+    }
+
+    return HTTP_CHAT_OK;
+}
+
 void http_chat_session(void)
 {
     http_chat_history_t history;

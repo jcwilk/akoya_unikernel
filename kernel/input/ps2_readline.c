@@ -1,5 +1,6 @@
 #include "input/ps2_readline.h"
 
+#include "event/runtime.h"
 #include "input/ps2_keyboard.h"
 
 int ps2_read_line(char *buf, int cap)
@@ -13,7 +14,8 @@ int ps2_read_line(char *buf, int cap)
 
     for (;;) {
         unsigned char scan = 0;
-        if (ps2_poll_scancode(&scan) != 0) {
+        if (ps2_keyboard_pop_scancode(&scan) != 0) {
+            (void)runtime_pump_once();
             continue;
         }
 

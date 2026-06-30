@@ -12,4 +12,19 @@ typedef enum {
 
 dhcp_status_t dhcp_acquire(ipv4_config_t *config_out, uint32_t timeout_ms);
 
+typedef struct {
+    int active;
+    int phase;
+    uint32_t deadline_ms;
+    uint32_t poll_until_ms;
+    dhcp_status_t result;
+    ipv4_config_t config;
+} dhcp_sm_t;
+
+void dhcp_sm_begin(dhcp_sm_t *sm, uint32_t timeout_ms);
+int dhcp_sm_step(dhcp_sm_t *sm);
+int dhcp_sm_done(const dhcp_sm_t *sm);
+dhcp_status_t dhcp_sm_result(const dhcp_sm_t *sm);
+const ipv4_config_t *dhcp_sm_config(const dhcp_sm_t *sm);
+
 #endif

@@ -167,6 +167,41 @@ void rtl8139_drain_tx(void)
     }
 }
 
+void rtl8139_irq_mask(void)
+{
+    rtl8139_write16(RTL8139_IMR, 0);
+}
+
+void rtl8139_irq_unmask(void)
+{
+    rtl8139_write16(RTL8139_IMR, 0x0005U);
+}
+
+int rtl8139_has_pending_rx(void)
+{
+    rtl8139_service_isr();
+
+    if ((inb((uint16_t)(io_base + RTL8139_CMD)) & 0x01U) != 0) {
+        return 1;
+    }
+
+    if (rx_offset >= RX_BUF_SIZE) {
+        rx_offset = (uint16_t)(rx_offset - RX_BUF_SIZE);
+    }
+
+    uint32_t status = *(uint32_t *)(rx_buffer + rx_offset);
+    if ((status & 0x00000001U) == 0) {
+        return 0;
+    }
+
+    uint16_t total_len = (uint16_t)((status >> 16) & 0x0FFFU);
+    if (total_len == RTL8139_RX_IN_PROGRESS) {
+        return 0;
+    }
+
+    return 1;
+}
+
 static int rtl8139_send(eth_device_t *dev, const uint8_t *frame, uint16_t length)
 {
     (void)dev;

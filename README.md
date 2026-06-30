@@ -96,9 +96,20 @@ When multiple logical images exist under `build/`, omit `--image` / `--logical` 
 - `build/chat-regression-test.bin` / `build/chat-regression-test.elf` — timed-gap multi-turn chat regression (production chat turn path, guest-side idle gaps)
 - `build/transport-test.bin` / `build/transport-test.elf` — non-interactive transport scenario suite
 
-The timed-gap chat regression image prints `turn N: PASS`/`FAIL` lines and a final aggregate `timed-gap-chat-regression: ALL PASS` or `timed-gap-chat-regression: FAILED`. It exercises the same `http_chat_run_turn` path as the main unikernel with bounded timed waits at the `> ` prompt between scheduled turns (default 5 s, three turns). **Passing transport-test alone does not satisfy the default multi-turn chat health gate** — use `make test` or `scripts/run-chat-regression-test.sh`.
+The timed-gap chat regression image prints `turn N: PASS`/`FAIL` lines and a final aggregate `timed-gap-chat-regression: ALL PASS` or `timed-gap-chat-regression: FAILED`. It exercises the same async chat turn path as the main unikernel with event-scheduled idle gaps at the `> ` prompt between scheduled turns (default 5 s, three turns). **Passing transport-test alone does not satisfy the default multi-turn chat health gate** — use `make test` or `scripts/run-chat-regression-test.sh`.
 
 The transport-test image prints per-scenario `PASS`/`FAIL` lines and a final aggregate `transport-test: ALL PASS` or `transport-test: FAILED`. The refused-connection scenario targets port **19999** on the configured chat host (synthetic closed port, not inference downtime).
+
+### Guest event runtime
+
+After console init the main kernel and timed-gap regression image enter a cooperative **event runtime** instead of blocking poll loops:
+
+- **Deferred device bottom-halves** (shared keyboard + RTL8139 shape): IRQ marks pending and masks the device line → bottom-half drains until hardware quiescent → unmask → one follow-up poll → clear pending.
+- **IRQ wakeups**: 8259 PIC + IDT; keyboard IRQ 1, wired NIC IRQ 11.
+- **Timer wheel** for runtime millisecond deadlines (DHCP/TCP/chat timeouts, timed-gap idle); `time_delay_ms` is reserved for boot calibration and immediate hardware settle.
+- **CPU idle**: when slots are quiescent and no timer is due soon, the runtime polls devices once and executes `hlt` until the next IRQ or timer.
+
+Headless automation entry points (`make test`, `make verify-usb`, scripted chat) are unchanged at the harness layer; only the guest execution model changed.
 
 ### Scripted chat interaction (`*.akoya-script`)
 

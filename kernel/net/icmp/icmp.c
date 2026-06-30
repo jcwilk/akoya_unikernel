@@ -96,3 +96,84 @@ icmp_status_t icmp_ping(ipv4_addr_t target, uint32_t timeout_ms, uint32_t *rtt_m
     link_register_ipv4_handler(0, 0);
     return sent_once ? ICMP_FAIL_TIMEOUT : ICMP_FAIL_UNREACHABLE;
 }
+
+void icmp_sm_begin(icmp_sm_t *sm, ipv4_addr_t target, uint32_t timeout_ms)
+{
+    ping_seq = (uint16_t)(time_millis() & 0xFFFFU);
+    reply_received = 0;
+
+    sm->active = 1;
+    sm->phase = 0;
+    sm->target = target;
+    sm->start_ms = time_millis();
+    sm->deadline_ms = sm->start_ms + timeout_ms;
+    sm->last_send_ms = sm->start_ms;
+    sm->rtt_ms = 0;
+    sm->result = ICMP_FAIL_TIMEOUT;
+    sm->sent_once = 0;
+
+    link_register_ipv4_handler(icmp_ipv4_handler, 0);
+}
+
+int icmp_sm_done(const icmp_sm_t *sm)
+{
+    return !sm->active;
+}
+
+icmp_status_t icmp_sm_result(const icmp_sm_t *sm)
+{
+    return sm->result;
+}
+
+uint32_t icmp_sm_rtt(const icmp_sm_t *sm)
+{
+    return sm->rtt_ms;
+}
+
+int icmp_sm_step(icmp_sm_t *sm)
+{
+    if (!sm->active) {
+        return 1;
+    }
+
+    uint32_t now = time_millis();
+    if (now >= sm->deadline_ms) {
+        sm->result = sm->sent_once ? ICMP_FAIL_TIMEOUT : ICMP_FAIL_UNREACHABLE;
+        link_unregister_ipv4_handler(icmp_ipv4_handler, 0);
+        sm->active = 0;
+        return 1;
+    }
+
+    if (reply_received) {
+        sm->rtt_ms = (now >= sm->start_ms) ? (now - sm->start_ms) : 0U;
+        sm->result = ICMP_OK;
+        link_unregister_ipv4_handler(icmp_ipv4_handler, 0);
+        sm->active = 0;
+        return 1;
+    }
+
+    if (now - sm->last_send_ms >= 1000U) {
+        uint8_t payload[64];
+        struct icmp_header *icmp = (struct icmp_header *)payload;
+
+        icmp->type = 8;
+        icmp->code = 0;
+        icmp->checksum = 0;
+        icmp->identifier = net_be16(ping_id);
+        icmp->sequence = net_be16(ping_seq);
+
+        for (int i = sizeof(struct icmp_header); i < (int)sizeof(payload); i++) {
+            payload[i] = (uint8_t)i;
+        }
+
+        uint16_t csum = ipv4_checksum(payload, (int)sizeof(payload));
+        icmp->checksum = net_be16(csum);
+
+        if (ipv4_send(sm->target, payload, (uint16_t)sizeof(payload), 1) == 0) {
+            sm->sent_once = 1;
+        }
+        sm->last_send_ms = now;
+    }
+
+    return 0;
+}
