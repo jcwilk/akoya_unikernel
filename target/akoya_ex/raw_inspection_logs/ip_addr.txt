@@ -1,0 +1,21 @@
+# ip addr
+
+ 
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: enp1s2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel qlen 1000
+    link/ether 00:40:d0:6f:2c:74 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.124/24 brd 192.168.1.255 scope global dynamic noprefixroute enp1s2
+       valid_lft 82808sec preferred_lft 72008sec
+    inet6 2600:1702:8912:a810::49/128 scope global dynamic noprefixroute 
+       valid_lft 1803sec preferred_lft 1803sec
+    inet6 2600:1702:8912:a810:535b:9c73:ac7d:25bc/64 scope global dynamic noprefixroute flags 100 
+       valid_lft 3423sec preferred_lft 3423sec
+    inet6 2600:1702:8912:a810:240:d0ff:fe6f:2c74/64 scope global dynamic flags 100 
+       valid_lft 0sec preferred_lft 0sec
+    inet6 fe80::240:d0ff:fe6f:2c74/64 scope link 
+       valid_lft forever preferred_lft forever

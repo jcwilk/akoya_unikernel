@@ -1,0 +1,15 @@
+# rfkill list all; echo; for f in /sys/class/rfkill/rfkill*/{index,type,name,state,soft,hard}; do echo -n "$f: "; cat $f 2>/dev/null; done
+
+ 
+0: phy2: Wireless LAN
+	Soft blocked: no
+	Hard blocked: no
+
+/sys/class/rfkill/rfkill0/index: 0
+/sys/class/rfkill/rfkill0/type: wlan
+/sys/class/rfkill/rfkill0/name: phy2
+/sys/class/rfkill/rfkill0/state: 1
+/sys/class/rfkill/rfkill0/soft: 0
+/sys/class/rfkill/rfkill0/hard: 0
+
+# exit_code=0

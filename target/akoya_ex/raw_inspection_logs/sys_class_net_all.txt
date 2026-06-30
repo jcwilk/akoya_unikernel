@@ -1,0 +1,19 @@
+# for d in /sys/class/net/*; do echo "=== $d ==="; ls -la "$d"; cat "$d/address" 2>/dev/null; cat "$d/device/uevent" 2>/dev/null; echo; done
+
+ 
+=== /sys/class/net/enp1s2 ===
+lrwxrwxrwx 1 root root 0 May 31 16:21 /sys/class/net/enp1s2 -> ../../devices/pci0000:00/0000:00:1e.0/0000:01:02.0/net/enp1s2
+00:40:d0:6f:2c:74
+DRIVER=8139too
+PCI_CLASS=20000
+PCI_ID=10EC:8139
+PCI_SUBSYS_ID=1071:8011
+PCI_SLOT_NAME=0000:01:02.0
+MODALIAS=pci:v000010ECd00008139sv00001071sd00008011bc02sc00i00
+
+=== /sys/class/net/lo ===
+lrwxrwxrwx 1 root root 0 Jun  1  2001 /sys/class/net/lo -> ../../devices/virtual/net/lo
+00:00:00:00:00:00
+
+
+# exit_code=0

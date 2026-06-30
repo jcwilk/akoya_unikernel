@@ -1,0 +1,8 @@
+# ls -la /sys/class/net/
+
+ 
+total 0
+drwxr-xr-x  2 root root 0 May 31 17:21 .
+drwxr-xr-x 64 root root 0 Jun  1  2001 ..
+lrwxrwxrwx  1 root root 0 May 31 16:21 enp1s2 -> ../../devices/pci0000:00/0000:00:1e.0/0000:01:02.0/net/enp1s2
+lrwxrwxrwx  1 root root 0 Jun  1  2001 lo -> ../../devices/virtual/net/lo

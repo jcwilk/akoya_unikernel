@@ -1,0 +1,10 @@
+# modprobe -n ipw2200 2>&1; lsmod | grep -E 'ipw|80211|cfg80211' 2>&1
+
+ 
+ipw2200               126976  0
+libipw                 28672  1 ipw2200
+lib80211               12288  1 libipw
+cfg80211              720896  2 ipw2200,libipw
+rfkill                 16384  1 cfg80211
+
+# exit_code=0

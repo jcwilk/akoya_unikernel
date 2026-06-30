@@ -1,0 +1,44 @@
+# dmesg 2>/dev/null | grep -iE 'ata|ide|piix|disk|scsi|usb-storage' || true
+
+ 
+[    0.000000] BIOS-provided physical RAM map:
+[    0.000000] BIOS-e820: [mem 0x000000007dff0000-0x000000007dffffbf] ACPI data
+[    0.013792] RAMDISK: [mem 0x7dda2000-0x7dfeffff]
+[    0.013796] Allocated new RAMDISK: [mem 0x36db0000-0x36ffd463]
+[    0.017386] Move RAMDISK from [mem 0x7dda2000-0x7dfef463] to [mem 0x36db0000-0x36ffd463]
+[    0.327909] Memory: 2016336K/2063928K available (14797K kernel code, 1842K rwdata, 4564K rodata, 1172K init, 488K bss, 47592K reserved, 0K cma-reserved, 1163208K highmem)
+[    0.417939] MMIO Stale Data: Unknown: No mitigations
+[    0.991590] ACPI: EC: EC_CMD/EC_SC=0x66, EC_DATA=0x62
+[    1.011157] pci 0000:00:02.0: Video device with shadowed ROM at [mem 0x000c0000-0x000dffff]
+[    1.013550] pci 0000:00:1f.1: BAR 0 [io  0x01f0-0x01f7]: legacy IDE quirk
+[    1.013555] pci 0000:00:1f.1: BAR 1 [io  0x03f6]: legacy IDE quirk
+[    1.013559] pci 0000:00:1f.1: BAR 2 [io  0x0170-0x0177]: legacy IDE quirk
+[    1.013563] pci 0000:00:1f.1: BAR 3 [io  0x0376]: legacy IDE quirk
+[    1.018729] ACPI: EC: EC_CMD/EC_SC=0x66, EC_DATA=0x62
+[    1.019291] SCSI subsystem initialized
+[    1.019370] libata version 3.00 loaded.
+[    1.024796] VFS: Disk quotas dquot_6.6.0
+[    1.070959] IP idents hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    1.811795] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 249)
+[    2.201839] ata_piix 0000:00:1f.1: version 2.13
+[    2.201862] ata_piix 0000:00:1f.1: enabling device (0005 -> 0007)
+[    2.203754] scsi host0: ata_piix
+[    2.204307] scsi host1: ata_piix
+[    2.204428] ata1: PATA max UDMA/100 cmd 0x1f0 ctl 0x3f6 bmdma 0x1100 irq 14
+[    2.204433] ata2: PATA max UDMA/100 cmd 0x170 ctl 0x376 bmdma 0x1108 irq 15
+[    2.366741] ata2.00: ATAPI: MATSHITADVD-RAM UJ-840S, 1.50, max UDMA/33
+[    2.374722] scsi 1:0:0:0: CD-ROM            MATSHITA DVD-RAM UJ-840S  1.50 PQ: 0 ANSI: 5
+[    2.405928] sr 1:0:0:0: [sr0] scsi3-mmc drive: 24x/24x writer dvd-ram cd/rw xa/form2 cdda tray
+[    2.421455] sr 1:0:0:0: Attached scsi CD-ROM sr0
+[    2.618219] usbcore: registered new interface driver usb-storage
+[    3.006342] usb-storage 2-3:1.0: USB Mass Storage device detected
+[    3.007955] scsi host2: usb-storage 2-3:1.0
+[    3.933883] Write protecting kernel text and read-only data: 19364k
+[    4.032520] scsi 2:0:0:0: Direct-Access     Kanguru  FlashBlu         PMAP PQ: 0 ANSI: 6
+[    4.070178] sd 2:0:0:0: [sda] Attached SCSI removable disk
+[   37.838977] ACPI: video: Video Device [GFX0] (multi-head: yes  rom: no  post: no)
+[   37.839342] input: Video Bus as /devices/LNXSYSTM:00/LNXSYBUS:00/PNP0A03:00/LNXVIDEO:00/input/input5
+[   43.554009] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[   44.388338] libipw: 802.11 data/management/control stack, git-1.1.13
+
+# exit_code=0

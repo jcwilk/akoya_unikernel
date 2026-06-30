@@ -1,0 +1,18 @@
+# lspci -nnv -s 01:04.0
+
+ 
+01:04.0 CardBus bridge [0607]: Texas Instruments PCI1410 PC card Cardbus Controller [104c:ac50] (rev 02)
+	Subsystem: Mitac Device [1071:8011]
+	Flags: bus master, medium devsel, latency 168, IRQ 11
+	Memory at e4000000 (32-bit, non-prefetchable) [size=4K]
+	Bus: primary=01, secondary=02, subordinate=05, sec-latency=176
+	Memory window 0: a0000000-a3ffffff (prefetchable)
+	Memory window 1: e8000000-ebffffff
+	I/O window 0: 0000c400-0000c4ff
+	I/O window 1: 0000c800-0000c8ff
+	16-bit legacy interface ports at 0001
+	Capabilities: [a0] Power Management version 1
+	Kernel driver in use: yenta_cardbus
+
+
+# exit_code=0

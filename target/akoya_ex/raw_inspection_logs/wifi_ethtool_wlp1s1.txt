@@ -1,0 +1,18 @@
+# ethtool wlp1s1 2>&1; echo; ethtool -i wlp1s1 2>&1
+
+ 
+Settings for wlp1s1:
+	Link detected: no
+
+driver: ipw2200
+version: 1.2.2kmprq
+firmware-version: ABG:9.0.5.27 (Dec 12 2007)
+expansion-rom-version: 
+bus-info: 0000:01:01.0
+supports-statistics: no
+supports-test: no
+supports-eeprom-access: yes
+supports-register-dump: no
+supports-priv-flags: no
+
+# exit_code=0

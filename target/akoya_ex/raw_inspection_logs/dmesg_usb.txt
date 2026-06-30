@@ -1,0 +1,70 @@
+# dmesg 2>/dev/null | grep -iE 'usb|ehci|uhci' || true
+
+ 
+[    0.057649] Kernel command line: BOOT_IMAGE=/boot/vmlinuz initrd=/boot/initrd.gz pmedia=usbflash pfix=ram forcepae
+[    0.057972] Unknown kernel command line parameters "pmedia=usbflash pfix=ram", will be passed to user space.
+[    1.019393] ACPI: bus type USB registered
+[    1.019458] usbcore: registered new interface driver usbfs
+[    1.019482] usbcore: registered new interface driver hub
+[    1.019499] usbcore: registered new device driver usb
+[    1.498680] pci 0000:00:1d.1: quirk_usb_early_handoff+0x0/0x83c took 414510 usecs
+[    1.706685] pci 0000:00:1d.7: quirk_usb_early_handoff+0x0/0x83c took 202876 usecs
+[    2.201012] usbcore: registered new interface driver rtsx_usb
+[    2.567886] uhci_hcd 0000:00:1d.0: UHCI Host Controller
+[    2.567899] uhci_hcd 0000:00:1d.0: new USB bus registered, assigned bus number 1
+[    2.567910] uhci_hcd 0000:00:1d.0: detected 2 ports
+[    2.567934] uhci_hcd 0000:00:1d.0: irq 10, io port 0x00001200
+[    2.568183] usb usb1: New USB device found, idVendor=1d6b, idProduct=0001, bcdDevice= 6.06
+[    2.568190] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    2.568195] usb usb1: Product: UHCI Host Controller
+[    2.568198] usb usb1: Manufacturer: Linux 6.6.141 uhci_hcd
+[    2.568202] usb usb1: SerialNumber: 0000:00:1d.0
+[    2.568529] hub 1-0:1.0: USB hub found
+[    2.569045] ehci-pci 0000:00:1d.7: EHCI Host Controller
+[    2.569056] ehci-pci 0000:00:1d.7: new USB bus registered, assigned bus number 2
+[    2.569071] ehci-pci 0000:00:1d.7: debug port 1
+[    2.573157] ehci-pci 0000:00:1d.7: irq 7, io mem 0xfebff000
+[    2.587663] ehci-pci 0000:00:1d.7: USB 2.0 started, EHCI 1.00
+[    2.587805] usb usb2: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 6.06
+[    2.587812] usb usb2: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    2.587816] usb usb2: Product: EHCI Host Controller
+[    2.587819] usb usb2: Manufacturer: Linux 6.6.141 ehci_hcd
+[    2.587823] usb usb2: SerialNumber: 0000:00:1d.7
+[    2.588107] hub 2-0:1.0: USB hub found
+[    2.615957] hub 1-0:1.0: USB hub found
+[    2.616190] uhci_hcd 0000:00:1d.1: UHCI Host Controller
+[    2.616200] uhci_hcd 0000:00:1d.1: new USB bus registered, assigned bus number 3
+[    2.616208] uhci_hcd 0000:00:1d.1: detected 2 ports
+[    2.616228] uhci_hcd 0000:00:1d.1: irq 11, io port 0x00001600
+[    2.616339] usb usb3: New USB device found, idVendor=1d6b, idProduct=0001, bcdDevice= 6.06
+[    2.616345] usb usb3: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    2.616350] usb usb3: Product: UHCI Host Controller
+[    2.616353] usb usb3: Manufacturer: Linux 6.6.141 uhci_hcd
+[    2.616357] usb usb3: SerialNumber: 0000:00:1d.1
+[    2.616648] hub 3-0:1.0: USB hub found
+[    2.617145] uhci_hcd 0000:00:1d.2: UHCI Host Controller
+[    2.617155] uhci_hcd 0000:00:1d.2: new USB bus registered, assigned bus number 4
+[    2.617163] uhci_hcd 0000:00:1d.2: detected 2 ports
+[    2.617182] uhci_hcd 0000:00:1d.2: irq 11, io port 0x00001700
+[    2.617292] usb usb4: New USB device found, idVendor=1d6b, idProduct=0001, bcdDevice= 6.06
+[    2.617298] usb usb4: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    2.617303] usb usb4: Product: UHCI Host Controller
+[    2.617306] usb usb4: Manufacturer: Linux 6.6.141 uhci_hcd
+[    2.617310] usb usb4: SerialNumber: 0000:00:1d.2
+[    2.617625] hub 4-0:1.0: USB hub found
+[    2.618164] usbcore: registered new interface driver uas
+[    2.618219] usbcore: registered new interface driver usb-storage
+[    2.618263] usbcore: registered new interface driver ums-realtek
+[    2.634644] usbcore: registered new interface driver usbhid
+[    2.634647] usbhid: USB HID core driver
+[    2.843690] usb 2-3: new high-speed USB device number 2 using ehci-pci
+[    3.005671] usb 2-3: New USB device found, idVendor=1e1d, idProduct=1106, bcdDevice= 1.10
+[    3.005678] usb 2-3: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[    3.005683] usb 2-3: Product: FlashBlu
+[    3.005687] usb 2-3: Manufacturer: Kanguru
+[    3.005690] usb 2-3: SerialNumber: 07089422921B9720
+[    3.006342] usb-storage 2-3:1.0: USB Mass Storage device detected
+[    3.007955] scsi host2: usb-storage 2-3:1.0
+[    3.933935]     pmedia=usbflash
+
+# exit_code=0

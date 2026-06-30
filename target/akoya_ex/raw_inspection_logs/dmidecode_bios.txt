@@ -1,0 +1,44 @@
+# dmidecode -t bios
+
+ 
+# dmidecode 3.7
+Getting SMBIOS data from sysfs.
+SMBIOS 2.3 present.
+
+Handle 0x0000, DMI type 0, 20 bytes
+Platform Firmware Information
+	Vendor: Insyde Software Corporation
+	Version: M1.02 
+	Release Date: 03/09/2005
+	Address: 0xEB000
+	Runtime Size: 84 KiB
+	ROM Size: 512 KiB
+	Characteristics:
+		PCI is supported
+		PC Card (PCMCIA) is supported
+		PNP is supported
+		APM is supported
+		Firmware is upgradeable
+		Firmware shadowing is allowed
+		Boot from CD is supported
+		EDD is supported
+		Japanese floppy for NEC 9800 1.2 MB is supported (int 13h)
+		3.5"/720 kB floppy services are supported (int 13h)
+		3.5"/2.88 MB floppy services are supported (int 13h)
+		Print screen service is supported (int 5h)
+		8042 keyboard services are supported (int 9h)
+		Printer services are supported (int 17h)
+		CGA/mono video services are supported (int 10h)
+		ACPI is supported
+		USB legacy is supported
+		LS-120 boot is supported
+		ATAPI Zip drive boot is supported
+		Smart battery is supported
+		Function key-initiated network boot is supported
+
+Handle 0x0014, DMI type 13, 22 bytes
+Firmware Language Information
+	Language Description Format: Abbreviated
+	Installable Languages: 1
+		en|US|iso8859-1
+	Currently Installed Language: en|US|iso8859-1

@@ -1,0 +1,23 @@
+# dmidecode -t chassis 2>&1
+
+ 
+# dmidecode 3.7
+Getting SMBIOS data from sysfs.
+SMBIOS 2.3 present.
+
+Handle 0x0003, DMI type 3, 17 bytes
+Chassis Information
+	Manufacturer: Notebook
+	Type: Portable
+	Lock: Not Present
+	Version: A1
+	Serial Number: 12345678
+	Asset Tag: 12345678
+	Boot-up State: Safe
+	Power Supply State: Safe
+	Thermal State: Safe
+	Security Status: None
+	OEM Information: 0x00000000
+
+
+# exit_code=0

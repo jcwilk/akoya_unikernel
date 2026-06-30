@@ -1,0 +1,6 @@
+# cat /sys/kernel/debug/usb/devices 2>&1 | head -300
+
+ 
+cat: /sys/kernel/debug/usb/devices: No such file or directory
+
+# exit_code=0

@@ -1,0 +1,7 @@
+# ls -la /lib/firmware/ipw2200* 2>&1
+
+ 
+-rw-r--r-- 1 root root 191154 May 31 17:42 /lib/firmware/ipw2200-bss.fw
+-rw-r--r-- 1 root root 185428 May 31 17:42 /lib/firmware/ipw2200-ibss.fw
+
+# exit_code=0

@@ -1,0 +1,9 @@
+# iwconfig 2>&1
+
+ 
+lo        no wireless extensions.
+
+enp1s2    no wireless extensions.
+
+
+# exit_code=0

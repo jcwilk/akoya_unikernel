@@ -1,0 +1,6 @@
+# ethtool -a enp1s2
+
+ 
+netlink error: Operation not supported
+
+# exit code: 1

@@ -1,0 +1,40 @@
+# for d in /sys/class/power_supply/*; do echo "=== $d ==="; for f in "$d"/*; do [ -f "$f" ] && echo "$(basename $f)=$(cat $f 2>/dev/null)"; done; echo; done 2>&1
+
+ 
+=== /sys/class/power_supply/AC ===
+online=1
+type=Mains
+uevent=POWER_SUPPLY_NAME=AC
+POWER_SUPPLY_TYPE=Mains
+POWER_SUPPLY_ONLINE=1
+
+=== /sys/class/power_supply/BAT0 ===
+alarm=0
+charge_now=0
+current_now=0
+cycle_count=0
+manufacturer=Generic Charger 
+model_name=Internal Battery
+present=1
+serial_number=
+status=Not charging
+technology=Li-ion
+type=Battery
+uevent=POWER_SUPPLY_NAME=BAT0
+POWER_SUPPLY_TYPE=Battery
+POWER_SUPPLY_STATUS=Not charging
+POWER_SUPPLY_PRESENT=1
+POWER_SUPPLY_TECHNOLOGY=Li-ion
+POWER_SUPPLY_CYCLE_COUNT=0
+POWER_SUPPLY_VOLTAGE_MIN_DESIGN=0
+POWER_SUPPLY_VOLTAGE_NOW=0
+POWER_SUPPLY_CURRENT_NOW=0
+POWER_SUPPLY_CHARGE_NOW=0
+POWER_SUPPLY_MODEL_NAME=Internal Battery
+POWER_SUPPLY_MANUFACTURER=Generic Charger 
+POWER_SUPPLY_SERIAL_NUMBER=
+voltage_min_design=0
+voltage_now=0
+
+
+# exit_code=0

@@ -1,0 +1,16 @@
+# dmesg 2>/dev/null | grep -iE 'i8042|ps/2|keyboard|serio' || true
+
+ 
+[    2.618433] i8042: PNP: PS/2 Controller [PNP0303:KBC,PNP0f13:PS2M] at 0x60,0x64 irq 1,12
+[    2.627336] i8042: Detected active multiplexing controller, rev 1.1
+[    2.632186] serio: i8042 KBD port at 0x60,0x64 irq 1
+[    2.632197] serio: i8042 AUX0 port at 0x60,0x64 irq 12
+[    2.632306] serio: i8042 AUX1 port at 0x60,0x64 irq 12
+[    2.632382] serio: i8042 AUX2 port at 0x60,0x64 irq 12
+[    2.632470] serio: i8042 AUX3 port at 0x60,0x64 irq 12
+[    2.632810] mousedev: PS/2 mouse device common for all mice
+[    2.638787] input: AT Translated Set 2 keyboard as /devices/platform/i8042/serio0/input/input0
+[   44.994592] psmouse serio3: synaptics: Touchpad model: 1, fw: 5.9, id: 0xf6eb1, caps: 0xa04713/0x0/0x0/0x0, board id: 0, fw id: 23186
+[   45.051285] input: SynPS/2 Synaptics TouchPad as /devices/platform/i8042/serio3/input/input11
+
+# exit_code=0

@@ -1,0 +1,6 @@
+# hwinfo --network
+
+ 
+sh: line 1: hwinfo: command not found
+
+# exit code: 127

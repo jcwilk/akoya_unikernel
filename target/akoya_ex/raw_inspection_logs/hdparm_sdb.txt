@@ -1,0 +1,6 @@
+# hdparm -I /dev/sdb 2>&1
+
+ 
+hdparm: can't open '/dev/sdb': No such file or directory
+
+# exit_code=0

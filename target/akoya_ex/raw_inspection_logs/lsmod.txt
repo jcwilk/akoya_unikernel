@@ -1,0 +1,70 @@
+# lsmod
+
+ 
+Module                  Size  Used by
+iptable_filter         12288  0
+ip_tables              20480  1 iptable_filter
+x_tables               24576  2 ip_tables,iptable_filter
+8021q                  28672  0
+garp                   12288  1 8021q
+stp                    12288  1 garp
+mrp                    16384  1 8021q
+llc                    12288  2 garp,stp
+tls                    86016  0
+joydev                 20480  0
+iTCO_wdt               12288  0
+intel_pmc_bxt          12288  1 iTCO_wdt
+iTCO_vendor_support    12288  1 iTCO_wdt
+watchdog               28672  1 iTCO_wdt
+snd_intel8x0m          16384  0
+snd_intel8x0           32768  0
+snd_ac97_codec        106496  2 snd_intel8x0m,snd_intel8x0
+snd_seq_midi           16384  0
+snd_seq_midi_event     12288  1 snd_seq_midi
+ac97_bus               12288  1 snd_ac97_codec
+snd_pcm_oss            49152  0
+snd_mixer_oss          20480  1 snd_pcm_oss
+pcspkr                 12288  0
+snd_pcm                94208  4 snd_pcm_oss,snd_intel8x0m,snd_ac97_codec,snd_intel8x0
+snd_rawmidi            28672  1 snd_seq_midi
+ipw2200               126976  0
+libipw                 28672  1 ipw2200
+snd_seq                57344  2 snd_seq_midi_event,snd_seq_midi
+snd_seq_device         12288  3 snd_seq,snd_rawmidi,snd_seq_midi
+snd_timer              28672  2 snd_seq,snd_pcm
+lib80211               12288  1 libipw
+psmouse               131072  0
+evdev                  16384  12
+i2c_i801               28672  0
+snd                    65536  10 snd_pcm_oss,snd_intel8x0m,snd_mixer_oss,snd_seq,snd_ac97_codec,snd_timer,snd_rawmidi,snd_intel8x0,snd_seq_device,snd_pcm
+serio_raw              16384  0
+acpi_cpufreq           20480  0
+soundcore              12288  1 snd
+lpc_ich                24576  0
+firewire_ohci          32768  0
+i2c_smbus              16384  1 i2c_i801
+cfg80211              720896  2 ipw2200,libipw
+rng_core               16384  0
+firewire_core          57344  1 firewire_ohci
+8139too                32768  0
+8139cp                 28672  0
+i915                 2400256  3
+mii                    12288  2 8139cp,8139too
+rfkill                 16384  1 cfg80211
+drm_buddy              16384  1 i915
+drm_display_helper    110592  1 i915
+cec                    40960  2 drm_display_helper,i915
+rc_core                45056  1 cec
+ttm                    53248  1 i915
+drm_kms_helper        110592  2 drm_display_helper,i915
+battery                20480  0
+ac                     16384  0
+drm                   389120  7 drm_display_helper,i915,ttm,drm_buddy,drm_kms_helper
+i2c_algo_bit           12288  1 i915
+button                 16384  0
+video                  57344  1 i915
+wmi                    20480  1 video
+zram                   24576  2
+zsmalloc               20480  1 zram
+
+# exit_code=0

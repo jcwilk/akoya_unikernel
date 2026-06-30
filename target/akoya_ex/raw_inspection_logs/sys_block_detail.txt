@@ -1,0 +1,12 @@
+# for b in /sys/block/sd* /sys/block/hd*; do [ -e "$b" ] || continue; echo "=== $b ==="; ls -la "$b"; cat "$b/device/model" 2>/dev/null; cat "$b/device/vendor" 2>/dev/null; cat "$b/queue/rotational" 2>/dev/null; cat "$b/size" 2>/dev/null; echo; done
+
+ 
+=== /sys/block/sda ===
+lrwxrwxrwx 1 root root 0 Jun  1  2001 /sys/block/sda -> ../devices/pci0000:00/0000:00:1d.7/usb2/2-3/2-3:1.0/host2/target2:0:0/2:0:0:0/block/sda
+FlashBlu        
+Kanguru 
+1
+30326784
+
+
+# exit_code=0

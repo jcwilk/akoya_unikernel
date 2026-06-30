@@ -1,0 +1,31 @@
+# amixer scontrols 2>&1
+
+ 
+Simple mixer control 'Master',0
+Simple mixer control 'Master Mono',0
+Simple mixer control 'PCM',0
+Simple mixer control 'Surround',0
+Simple mixer control 'Surround Jack Mode',0
+Simple mixer control 'Center',0
+Simple mixer control 'LFE',0
+Simple mixer control 'Line',0
+Simple mixer control 'CD',0
+Simple mixer control 'Mic',0
+Simple mixer control 'Mic Boost (+20dB)',0
+Simple mixer control 'Mic Select',0
+Simple mixer control 'Video',0
+Simple mixer control 'Phone',0
+Simple mixer control 'IEC958',0
+Simple mixer control 'IEC958 Playback AC97-SPSA',0
+Simple mixer control 'IEC958 Playback Source',0
+Simple mixer control 'Beep',0
+Simple mixer control 'Aux',0
+Simple mixer control 'Mono Output Select',0
+Simple mixer control 'Capture',0
+Simple mixer control 'Mix',0
+Simple mixer control 'Mix Mono',0
+Simple mixer control 'Channel Mode',0
+Simple mixer control 'Duplicate Front',0
+Simple mixer control 'External Amplifier',0
+
+# exit_code=0

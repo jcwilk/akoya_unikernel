@@ -1,0 +1,8 @@
+# cat /sys/class/graphics/fb0/name /sys/class/graphics/fb0/virtual_size /sys/class/graphics/fb0/bits_per_pixel 2>&1
+
+ 
+i915drmfb
+1280,768
+32
+
+# exit_code=0

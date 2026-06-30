@@ -1,0 +1,4 @@
+# cat /proc/cmdline
+
+ 
+BOOT_IMAGE=/boot/vmlinuz initrd=/boot/initrd.gz pmedia=usbflash pfix=ram forcepae

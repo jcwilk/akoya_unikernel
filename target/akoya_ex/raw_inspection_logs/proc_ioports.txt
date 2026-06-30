@@ -1,0 +1,77 @@
+# cat /proc/ioports
+
+ 
+0000-0cf7 : PCI Bus 0000:00
+  0000-001f : dma1
+  0020-0021 : pic1
+  0040-0043 : timer0
+  0050-0053 : timer1
+  0060-0060 : keyboard
+  0061-0061 : PNP0800:00
+  0062-0062 : PNP0C09:00
+    0062-0062 : EC data
+  0064-0064 : keyboard
+  0066-0066 : PNP0C09:00
+    0066-0066 : EC cmd
+  0070-0077 : rtc0
+  0080-008f : dma page reg
+  00a0-00a1 : pic2
+  00c0-00df : dma2
+  00f0-00ff : fpu
+    00f0-00f0 : PNP0C04:00
+  0170-0177 : 0000:00:1f.1
+    0170-0177 : ata_piix
+  01f0-01f7 : 0000:00:1f.1
+    01f0-01f7 : ata_piix
+  0200-020f : pnp 00:04
+  0290-0297 : pnp 00:04
+  02f8-02ff : WEC0510:00
+    02f8-02ff : serial
+  0376-0376 : 0000:00:1f.1
+    0376-0376 : ata_piix
+  03c0-03df : vga+
+  03f6-03f6 : 0000:00:1f.1
+    03f6-03f6 : ata_piix
+  0680-06ff : pnp 00:04
+  077c-077f : pnp 00:04
+0cf8-0cff : PCI conf1
+0d00-ffff : PCI Bus 0000:00
+  1000-107f : 0000:00:1f.0
+    1000-107f : pnp 00:04
+      1000-1003 : ACPI PM1a_EVT_BLK
+      1004-1005 : ACPI PM1a_CNT_BLK
+      1008-100b : ACPI PM_TMR
+      1010-1015 : ACPI CPU throttle
+      1020-1020 : ACPI PM2_CNT_BLK
+      1028-102f : ACPI GPE0_BLK
+      1030-1033 : iTCO_wdt.1.auto
+        1030-1033 : iTCO_wdt
+      1060-107f : iTCO_wdt.1.auto
+        1060-107f : iTCO_wdt
+  1100-110f : 0000:00:1f.1
+    1100-110f : ata_piix
+  1200-121f : 0000:00:1d.0
+    1200-121f : uhci_hcd
+  1300-133f : 0000:00:1f.0
+    1300-133f : pnp 00:04
+  1400-141f : 0000:00:1f.3
+    1400-141f : i801_smbus
+  1600-161f : 0000:00:1d.1
+    1600-161f : uhci_hcd
+  1700-171f : 0000:00:1d.2
+    1700-171f : uhci_hcd
+  c000-dfff : PCI Bus 0000:01
+    c000-c07f : 0000:01:05.0
+    c100-c1ff : 0000:01:02.0
+      c100-c1ff : 8139too
+    c400-c4ff : PCI CardBus 0000:02
+    c800-c8ff : PCI CardBus 0000:02
+  e000-e007 : 0000:00:02.0
+  e100-e1ff : 0000:00:1f.5
+    e100-e1ff : Intel 82801DB-ICH4
+  e200-e23f : 0000:00:1f.5
+    e200-e23f : Intel 82801DB-ICH4
+  e300-e3ff : 0000:00:1f.6
+    e300-e3ff : Intel 82801DB-ICH4 Modem
+  e400-e47f : 0000:00:1f.6
+    e400-e47f : Intel 82801DB-ICH4 Modem

@@ -1,0 +1,95 @@
+# cat /sys/class/net/wlp1s1/address /sys/class/net/wlp1s1/operstate /sys/class/net/wlp1s1/carrier /sys/class/net/wlp1s1/device/uevent 2>&1; echo; udevadm info -a -p /sys/class/net/wlp1s1 2>&1 | head -80
+
+ 
+00:0e:35:ae:a2:be
+unknown
+1
+DRIVER=ipw2200
+PCI_CLASS=28000
+PCI_ID=8086:4220
+PCI_SUBSYS_ID=8086:2701
+PCI_SLOT_NAME=0000:01:01.0
+MODALIAS=pci:v00008086d00004220sv00008086sd00002701bc02sc80i00
+
+
+Udevadm info starts with the device specified by the devpath and then
+walks up the chain of parent devices. It prints for every device
+found, all possible attributes in the udev rules key format.
+A rule to match, can be composed by the attributes of the device
+and the attributes from one single parent device.
+
+  looking at device '/devices/pci0000:00/0000:00:1e.0/0000:01:01.0/net/wlp1s1':
+    KERNEL=="wlp1s1"
+    SUBSYSTEM=="net"
+    DRIVER==""
+    ATTR{netdev_group}=="0"
+    ATTR{addr_len}=="6"
+    ATTR{flags}=="0x1003"
+    ATTR{gro_flush_timeout}=="0"
+    ATTR{testing}=="0"
+    ATTR{carrier_up_count}=="0"
+    ATTR{mtu}=="1500"
+    ATTR{dormant}=="0"
+    ATTR{link_mode}=="0"
+    ATTR{dev_port}=="0"
+    ATTR{proto_down}=="0"
+    ATTR{operstate}=="unknown"
+    ATTR{napi_defer_hard_irqs}=="0"
+    ATTR{broadcast}=="ff:ff:ff:ff:ff:ff"
+    ATTR{addr_assign_type}=="0"
+    ATTR{type}=="1"
+    ATTR{tx_queue_len}=="1000"
+    ATTR{carrier_changes}=="0"
+    ATTR{name_assign_type}=="4"
+    ATTR{threaded}=="0"
+    ATTR{ifalias}==""
+    ATTR{iflink}=="3"
+    ATTR{carrier_down_count}=="0"
+    ATTR{dev_id}=="0x0"
+    ATTR{ifindex}=="3"
+    ATTR{address}=="00:0e:35:ae:a2:be"
+    ATTR{carrier}=="1"
+
+  looking at parent device '/devices/pci0000:00/0000:00:1e.0/0000:01:01.0':
+    KERNELS=="0000:01:01.0"
+    SUBSYSTEMS=="pci"
+    DRIVERS=="ipw2200"
+    ATTRS{subsystem_device}=="0x2701"
+    ATTRS{scan_age}=="3750"
+    ATTRS{vendor}=="0x8086"
+    ATTRS{d3cold_allowed}=="1"
+    ATTRS{msi_bus}=="1"
+    ATTRS{device}=="0x4220"
+    ATTRS{power_state}=="D0"
+    ATTRS{speed_scan}=="0"
+    ATTRS{local_cpulist}=="0"
+    ATTRS{nic_type}=="TYPE: 0"
+    ATTRS{reset_method}=="pm bus"
+    ATTRS{class}=="0x028000"
+    ATTRS{ucode_version}=="0x0000d160"
+    ATTRS{indirect_dword}=="0x00000000"
+    ATTRS{led}=="1"
+    ATTRS{error}==""
+    ATTRS{driver_override}=="(null)"
+    ATTRS{cfg}=="0x00000100"
+    ATTRS{command_event_reg}=="0x08003600"
+    ATTRS{status}=="0x00000022"
+    ATTRS{indirect_byte}=="0x00"
+    ATTRS{local_cpus}=="1"
+    ATTRS{enable}=="1"
+    ATTRS{direct_dword}=="0x00000000"
+    ATTRS{eeprom_delay}=="1"
+    ATTRS{irq}=="11"
+    ATTRS{net_stats}=="0"
+    ATTRS{revision}=="0x05"
+    ATTRS{broken_parity_status}=="0"
+    ATTRS{rtap_filter}=="0x0000"
+    ATTRS{rf_kill}=="0"
+    ATTRS{dma_mask_bits}=="32"
+    ATTRS{ari_enabled}=="0"
+    ATTRS{rtap_iface}=="-1"
+    ATTRS{cmd_log}==""
+    ATTRS{consistent_dma_mask_bits}=="32"
+    ATTRS{subsystem_vendor}=="0x8086"
+
+# exit_code=0

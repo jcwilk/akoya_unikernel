@@ -1,0 +1,16 @@
+# lspci -nnv -s 00:1f.5
+
+ 
+00:1f.5 Multimedia audio controller [0401]: Intel Corporation 82801DB/DBL/DBM (ICH4/ICH4-L/ICH4-M) AC'97 Audio Controller [8086:24c5] (rev 03)
+	Subsystem: Mitac Device [1071:8011]
+	Flags: bus master, medium devsel, latency 0, IRQ 5
+	I/O ports at e100 [size=256]
+	I/O ports at e200 [size=64]
+	Memory at f0080400 (32-bit, non-prefetchable) [size=512]
+	Memory at f0080600 (32-bit, non-prefetchable) [size=256]
+	Capabilities: [50] Power Management version 2
+	Kernel driver in use: snd_intel8x0
+	Kernel modules: snd_intel8x0
+
+
+# exit_code=0

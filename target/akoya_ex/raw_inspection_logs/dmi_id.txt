@@ -1,0 +1,26 @@
+# cat /sys/class/dmi/id/* 2>&1
+
+ 
+03/09/2005
+Insyde Software Corporation
+M1.02 
+Montara-GML
+12345678
+Notebook
+FAB-2
+12345678
+12345678
+8
+Notebook
+A1
+dmi:bvnInsydeSoftwareCorporation:bvrM1.02:bd03/09/2005:svnNotebook:pnMIM2060:pvrFAB-2:rvnNotebook:rnMontara-GML:rvrFAB-2:cvnNotebook:ct8:cvrA1:
+cat: /sys/class/dmi/id/power: Is a directory
+MIM2060
+12345678
+00000000-0000-0000-0000-0040d06f2c74
+FAB-2
+cat: /sys/class/dmi/id/subsystem: Is a directory
+Notebook
+MODALIAS=dmi:bvnInsydeSoftwareCorporation:bvrM1.02:bd03/09/2005:svnNotebook:pnMIM2060:pvrFAB-2:rvnNotebook:rnMontara-GML:rvrFAB-2:cvnNotebook:ct8:cvrA1:
+
+# exit_code=0

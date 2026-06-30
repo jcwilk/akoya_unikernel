@@ -1,0 +1,8 @@
+# find /lib/modules/$(uname -r) -name '*i8042*' -o -name '*8139*' -o -name '*ipw2200*' 2>/dev/null | head -50
+
+ 
+/lib/modules/6.6.141/kernel/drivers/net/ethernet/realtek/8139cp.ko
+/lib/modules/6.6.141/kernel/drivers/net/ethernet/realtek/8139too.ko
+/lib/modules/6.6.141/kernel/drivers/net/wireless/intel/ipw2x00/ipw2200.ko
+
+# exit_code=0

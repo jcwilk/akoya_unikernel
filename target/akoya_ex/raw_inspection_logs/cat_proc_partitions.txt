@@ -1,0 +1,15 @@
+# cat /proc/partitions
+
+ 
+major minor  #blocks  name
+
+   7        0     318300 loop0
+   7        1     114576 loop1
+   7        2      43836 loop2
+   7        3      42104 loop3
+  11        0    1048575 sr0
+   8        0   15163392 sda
+   8        1   15162368 sda1
+ 254        0    1972580 zram0
+
+# exit_code=0

@@ -1,0 +1,13 @@
+# ethtool -i enp1s2
+
+ 
+driver: 8139too
+version: 0.9.28
+firmware-version: 
+expansion-rom-version: 
+bus-info: 0000:01:02.0
+supports-statistics: yes
+supports-test: no
+supports-eeprom-access: no
+supports-register-dump: yes
+supports-priv-flags: no

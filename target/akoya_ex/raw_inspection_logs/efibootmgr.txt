@@ -1,0 +1,6 @@
+# efibootmgr 2>&1
+
+ 
+sh: line 1: efibootmgr: command not found
+
+# exit_code=0

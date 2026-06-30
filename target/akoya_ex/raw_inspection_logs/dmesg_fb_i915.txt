@@ -1,0 +1,36 @@
+# dmesg 2>/dev/null | grep -iE 'fb|i915|drm|vga' | head -80 || true
+
+ 
+[    0.000000] BIOS-e820: [mem 0x0000000000000000-0x000000000009fbff] usable
+[    0.000000] BIOS-e820: [mem 0x000000007dff0000-0x000000007dffffbf] ACPI data
+[    0.000000] BIOS-e820: [mem 0x00000000ffb80000-0x00000000ffbfffff] reserved
+[    0.017437] ACPI: FACP 0x000000007DFFFB00 000074 (v01 INSYDE FACP_000 00000100 _CSI 00010103)
+[    0.017467] ACPI: BOOT 0x000000007DFFFB90 000028 (v01 INSYDE SYS_BOOT 00000100 _CSI 00010103)
+[    0.017475] ACPI: DBGP 0x000000007DFFFBC0 000034 (v01 INSYDE DBGP_000 00000100 _CSI 00010103)
+[    0.017491] ACPI: Reserving FACP table memory at [mem 0x7dfffb00-0x7dfffb73]
+[    0.017502] ACPI: Reserving BOOT table memory at [mem 0x7dfffb90-0x7dfffbb7]
+[    0.017505] ACPI: Reserving DBGP table memory at [mem 0x7dfffbc0-0x7dfffbf3]
+[    0.057297] [mem 0x80000000-0xffb7ffff] available for PCI devices
+[    0.416068] Console: colour VGA+ 80x25
+[    1.010585] pci_bus 0000:00: root bus resource [mem 0xffb80000-0xffbfffff]
+[    1.015961] pci 0000:00:1e.0:   bridge window [mem 0xffb80000-0xffbfffff] (subtractive decode)
+[    1.020882] pci 0000:00:02.0: vgaarb: setting as boot VGA device
+[    1.020887] pci 0000:00:02.0: vgaarb: bridge control possible
+[    1.020891] pci 0000:00:02.0: vgaarb: VGA device added: decodes=io+mem,owns=io+mem,locks=none
+[    1.020904] vgaarb: loaded
+[    1.073553] resource: avoiding allocation from e820 entry [mem 0xffb80000-0xffbfffff]
+[    1.073567] resource: avoiding allocation from e820 entry [mem 0xffb80000-0xffbfffff]
+[    1.073702] pci_bus 0000:00: resource 9 [mem 0xffb80000-0xffbfffff]
+[    1.073751] pci_bus 0000:01: resource 9 [mem 0xffb80000-0xffbfffff]
+[   38.504331] ACPI: bus type drm_connector registered
+[   43.132617] resource: avoiding allocation from e820 entry [mem 0xffb80000-0xffbfffff]
+[   43.133364] i915 0000:00:02.0: vgaarb: deactivate vga console
+[   43.140771] i915 0000:00:02.0: vgaarb: VGA decodes changed: olddecodes=io+mem,decodes=io+mem:owns=io+mem
+[   43.229126] i915 0000:00:02.0: [drm] Initialized overlay support.
+[   43.229209] i915 0000:00:02.0: [drm] PMU not supported for this GPU.
+[   43.231934] i915 0000:00:02.0: [drm] Skipping intel_backlight registration
+[   43.232149] [drm] Initialized i915 1.6.0 20201103 for 0000:00:02.0 on minor 0
+[   43.327206] fbcon: i915drmfb (fb0) is primary device
+[   43.911246] i915 0000:00:02.0: [drm] fb0: i915drmfb frame buffer device
+
+# exit_code=0

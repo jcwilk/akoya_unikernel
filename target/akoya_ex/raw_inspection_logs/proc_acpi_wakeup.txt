@@ -1,0 +1,14 @@
+# cat /proc/acpi/wakeup 2>&1
+
+ 
+Device	S-state	  Status   Sysfs node
+SBTN	  S4	*enabled   platform:PNP0C0E:00
+LAN	  S3	*disabled  pci:0000:01:02.0
+USB0	  S3	*enabled   pci:0000:00:1d.0
+USB1	  S3	*enabled   pci:0000:00:1d.1
+USB2	  S3	*enabled   pci:0000:00:1d.2
+USB3	  S3	*enabled   pci:0000:00:1d.7
+AC97	  S3	*disabled  pci:0000:00:1f.5
+MC97	  S3	*disabled  pci:0000:00:1f.6
+
+# exit_code=0
