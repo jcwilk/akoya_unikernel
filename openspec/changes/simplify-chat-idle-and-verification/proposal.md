@@ -6,9 +6,9 @@ Interactive chat on the main kernel image fails reliably after the operator wait
 
 - **BREAKING:** Retire the timed-gap chat regression boot identity and its dedicated automated entry point; multi-turn idle-at-prompt health is verified on the **main interactive chat unikernel** instead.
 - Simplify the interactive chat idle loop to two responsibilities: poll operator input and poll wired network, with one production turn path per message.
-- Remove accumulated band-aids (per-turn address-cache invalidation, periodic announce refresh, parallel async turn machinery, hyper-calibrated per-subsystem frame and timeout limits) in favor of one predictable poll/teardown policy.
+- Remove accumulated band-aids (per-turn address-cache invalidation, periodic announce refresh, parallel async turn machinery, redundant special-case timeout branches) in favor of one predictable poll/teardown policy while **keeping** bounded work per runtime visit.
 - Collapse the development verification suite to a small set of focused gates: default multi-turn idle-at-prompt chat on the main image, transport-only verification, and documented headful manual check.
-- Strengthen the default automated gate to match headful reproduction: short first message, substantial idle gap at the prompt, short second message, zero tolerance for connection-failure lines between successful turns.
+- Strengthen the default automated gate to match headful reproduction: short first message, **twenty-second** idle at the prompt, short second message, zero tolerance for connection-failure lines between successful turns.
 
 ## Capabilities
 
@@ -20,7 +20,7 @@ _None — behavior is consolidated into existing domains._
 
 - `interactive-chat-session`: explicit idle-at-prompt follow-up reliability; simpler idle servicing contract.
 - `dev-test-runner`: new default multi-turn gate on the main chat unikernel with host-timed idle gap; remove timed-gap regression runner requirements.
-- `guest-event-runtime`: wired network servicing during input wait without artificial per-iteration receive caps that can starve follow-up turns.
+- `guest-event-runtime`: drop timed-regression-only idle scenario; retain bounded work per visit.
 - `guest-timekeeping`: decouple millisecond accuracy scenarios from the retired regression image.
 
 ### Removed Capabilities

@@ -5,13 +5,13 @@
 - [ ] 1.1 Simplify interactive chat to one idle loop: poll operator input and wired network at the prompt; one blocking production turn per submitted message
 - [ ] 1.2 Remove per-turn address-cache invalidation, periodic announce refresh, and chat-turn async TCP state machinery used only for mitigation
 - [ ] 1.3 Unify TCP open/exchange/close/drain policy; resolve link-layer addresses on send when needed rather than invalidating valid cache entries at turn boundaries
-- [ ] 1.4 Service wired receive during input-prompt idle without artificial per-iteration frame caps that can stale inbound readiness across long waits
+- [ ] 1.4 Ensure input-prompt idle visits wired receive every runtime pass while keeping bounded work per visit (do not remove conservative per-iteration batch limits)
 - [ ] 1.5 Verify headful: first message, substantial wait at prompt, second message — no spurious connection-failure line when endpoint is reachable
 
 ### Verification consolidation
 
 - [ ] 2.1 Retire timed-gap chat regression boot image from build outputs and remove its dedicated runner
-- [ ] 2.2 Consolidate scripted fixtures to one idle-at-prompt definition (short message, ~20s host delay, short second message, exit)
+- [ ] 2.2 Consolidate scripted fixtures to one idle-at-prompt definition (short message, 20s host-timed idle at prompt, short second message, exit)
 - [ ] 2.3 Point default automated verification (`make test`) at main chat unikernel idle-at-prompt gate plus transport-only verification; remove redundant idle/repro runners and duplicate fixtures
 - [ ] 2.4 Update README verification narrative to match the reduced gate set
 

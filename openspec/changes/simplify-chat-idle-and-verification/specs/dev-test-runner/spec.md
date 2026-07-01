@@ -2,7 +2,7 @@
 
 ### Requirement: Default automated verification exercises multi-turn chat
 
-The project's default automated verification entry point SHALL run multi-turn interactive chat on the main chat unikernel when the inference endpoint is reachable. The gate SHALL submit at least two non-exit user messages with a substantial host-timed idle period at the input prompt between the first successful turn and the second submission, exercising the same production interactive session path used in headful operation. Pass SHALL require plain assistant reply text after each successful turn and SHALL treat unexpected connection-failure or transport-lifecycle failure outcome lines between successful turns as non-zero exit.
+The project's default automated verification entry point SHALL run multi-turn interactive chat on the main chat unikernel when the inference endpoint is reachable. The gate SHALL submit at least two non-exit user messages with a host-timed idle period of at least twenty seconds at the input prompt between the first successful turn and the second submission, exercising the same production interactive session path used in headful operation. Pass SHALL require plain assistant reply text after each successful turn and SHALL treat unexpected connection-failure or transport-lifecycle failure outcome lines between successful turns as non-zero exit.
 
 #### Scenario: Default gate fails on idle-at-prompt connect regression
 
@@ -23,7 +23,7 @@ The project's default automated verification entry point SHALL run multi-turn in
 
 - **GIVEN** the default automated verification entry point runs with a reachable chat-completions endpoint
 - **WHEN** verification completes successfully
-- **THEN** the verification path included a substantial idle period at the input prompt between the first successful turn and the second user submission
+- **THEN** the verification path included an idle period of at least twenty seconds at the input prompt between the first successful turn and the second user submission
 - **AND** success is determined on the main interactive chat unikernel rather than a separate regression-only boot identity
 
 ### Requirement: Transport verification does not substitute for multi-turn chat gate
