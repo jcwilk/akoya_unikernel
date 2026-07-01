@@ -8,10 +8,9 @@
 #include "net/eth/nic_device.h"
 #include "net/http/http_chat.h"
 #include "net/icmp/icmp.h"
-#include "net/ipv4/ipv4.h"
 #include "net/link/link.h"
+#include "net/lwip/lwip_pump.h"
 #include "net/tcp/tcp.h"
-#include "time/timer.h"
 #include "time/time.h"
 
 #ifndef AKOYA_CHAT_HOST_IP0
@@ -25,14 +24,6 @@
 #endif
 #ifndef AKOYA_CHAT_HOST_IP3
 #define AKOYA_CHAT_HOST_IP3 2
-#endif
-
-#ifndef AKOYA_CHAT_REGRESSION_TURNS
-#define AKOYA_CHAT_REGRESSION_TURNS 3
-#endif
-
-#ifndef AKOYA_CHAT_REGRESSION_GAP_MS
-#define AKOYA_CHAT_REGRESSION_GAP_MS 5000U
 #endif
 
 #ifndef AKOYA_CHAT_TIMEOUT_MS
@@ -50,8 +41,6 @@ typedef enum {
     BOOT_SETTLE,
     BOOT_DHCP,
     BOOT_IP_PRINT,
-    BOOT_ANNOUNCE,
-    BOOT_ARP,
     BOOT_CLEAR,
     BOOT_ICMP,
     BOOT_CHAT,
@@ -61,12 +50,9 @@ typedef enum {
 typedef struct {
     boot_phase_t phase;
     dhcp_sm_t dhcp;
-    arp_sm_t arp;
     icmp_sm_t icmp;
-    int regression_mode;
     int network_ok;
     uint32_t settle_until_ms;
-    uint32_t announce_until_ms;
 } boot_ctx_t;
 
 typedef enum {
@@ -79,7 +65,6 @@ typedef enum {
     CHAT_TURN_RECV,
     CHAT_TURN_CLOSE,
     CHAT_TURN_POST,
-    CHAT_GAP_WAIT,
     CHAT_EXIT
 } chat_phase_t;
 
@@ -96,26 +81,16 @@ typedef struct {
     uint8_t response[HTTP_CHAT_RECV_CAP];
     tcp_sm_t tcp;
     http_chat_status_t turn_status;
-    int regression_mode;
-    int regression_turn;
-    int turn_failures;
-    int gap_ready;
-    int gap_timer_handle;
 } chat_ctx_t;
 
 static boot_ctx_t boot;
 static chat_ctx_t chat;
+static int chat_connect_attempts;
 
 static int http_recv_complete_wrapper(const uint8_t *buf, uint16_t len, void *ctx)
 {
     (void)ctx;
     return http_chat_response_complete(buf, len);
-}
-
-static void gap_timer_done(void *ctx)
-{
-    (void)ctx;
-    chat.gap_ready = 1;
 }
 
 static void console_write_ipv4(ipv4_addr_t addr)
@@ -175,38 +150,6 @@ static int str_eq_ci(const char *a, const char *b)
     return *a == '\0' && *b == '\0';
 }
 
-static const char *scheduled_message(int turn_index)
-{
-    static const char *messages[] = { "hi", "what", "next" };
-    if (turn_index < 0 || turn_index >= (int)(sizeof(messages) / sizeof(messages[0]))) {
-        return "hi";
-    }
-    return messages[turn_index];
-}
-
-static void report_turn(int turn_number, int pass, const char *reason)
-{
-    console_write("turn ");
-    char num_buf[4];
-    if (turn_number >= 10) {
-        num_buf[0] = (char)('0' + (turn_number / 10));
-        num_buf[1] = (char)('0' + (turn_number % 10));
-        num_buf[2] = '\0';
-    } else {
-        num_buf[0] = (char)('0' + turn_number);
-        num_buf[1] = '\0';
-    }
-    console_write(num_buf);
-    if (pass) {
-        console_write_line(": PASS");
-    } else {
-        console_write(": FAIL (");
-        console_write(reason);
-        console_write_line(")");
-        chat.turn_failures++;
-    }
-}
-
 static int boot_active(void)
 {
     return boot.phase != BOOT_DONE;
@@ -256,38 +199,20 @@ static void boot_step(void)
             boot.phase = BOOT_DONE;
             return;
         }
-        ipv4_set_config(dhcp_sm_config(&boot.dhcp));
         console_write("net_ip=");
         console_write_ipv4(dhcp_sm_config(&boot.dhcp)->address);
         console_write_line("");
-
         {
-            ipv4_config_t config = *ipv4_get_config();
-            if (ipv4_is_zero(config.gateway)) {
-                config.gateway = config.address;
-                config.gateway.bytes[3] = 254U;
-                ipv4_set_config(&config);
+            ipv4_config_t cfg = *dhcp_sm_config(&boot.dhcp);
+            if (ipv4_is_zero(cfg.gateway)) {
+                cfg.gateway = cfg.address;
+                cfg.gateway.bytes[3] = 254U;
             }
-        }
-
-        link_announce_ipv4(ipv4_get_config()->address);
-        boot.announce_until_ms = time_millis() + 1000U;
-        boot.phase = BOOT_ANNOUNCE;
-        return;
-    case BOOT_ANNOUNCE:
-        if (time_millis() < boot.announce_until_ms) {
-            return;
-        }
-        if (!ipv4_is_zero(ipv4_get_config()->gateway)) {
-            arp_sm_begin(&boot.arp, ipv4_get_config()->gateway, 3000U);
-            boot.phase = BOOT_ARP;
-        } else {
-            boot.phase = BOOT_CLEAR;
-        }
-        return;
-    case BOOT_ARP:
-        if (!arp_sm_step(&boot.arp)) {
-            return;
+            lwip_stack_apply_ipv4_config(&cfg);
+            ipv4_set_config(&cfg);
+            for (int i = 0; i < 50; i++) {
+                lwip_stack_pump(1);
+            }
         }
         boot.phase = BOOT_CLEAR;
         return;
@@ -316,15 +241,7 @@ static void boot_step(void)
         return;
     }
     case BOOT_CHAT:
-        if (boot.regression_mode) {
-            chat.regression_mode = 1;
-            chat.regression_turn = 0;
-            chat.phase = CHAT_GAP_WAIT;
-            chat.gap_ready = 1;
-            chat.gap_timer_handle = TIMER_HANDLE_INVALID;
-        } else {
-            chat.phase = CHAT_PROMPT;
-        }
+        chat.phase = CHAT_PROMPT;
         boot.phase = BOOT_DONE;
         return;
     default:
@@ -351,6 +268,8 @@ static void chat_begin_turn(const char *message)
     }
 
     tcp_sm_init(&chat.tcp);
+    chat_connect_attempts = 0;
+    lwip_stack_arp_prime(chat_host_ip());
     tcp_sm_begin_drain(&chat.tcp, TCP_CLOSE_DRAIN_MS, 1);
     chat.phase = CHAT_TURN_DRAIN;
 }
@@ -398,6 +317,15 @@ static void chat_step(void)
             return;
         }
         if (tcp_sm_result(&chat.tcp) != TCP_OK) {
+            if (chat_connect_attempts < 2
+                && (tcp_sm_result(&chat.tcp) == TCP_FAIL_CONNECT
+                    || tcp_sm_result(&chat.tcp) == TCP_FAIL_TIMEOUT)) {
+                chat_connect_attempts++;
+                lwip_stack_arp_prime(chat_host_ip());
+                tcp_sm_init(&chat.tcp);
+                tcp_sm_begin_open(&chat.tcp, chat_host_ip(), (uint16_t)AKOYA_CHAT_PORT, AKOYA_CHAT_TIMEOUT_MS);
+                return;
+            }
             chat.turn_status = (tcp_sm_result(&chat.tcp) == TCP_FAIL_TIMEOUT)
                 ? HTTP_CHAT_FAIL_TIMEOUT
                 : HTTP_CHAT_FAIL_CONNECT;
@@ -465,67 +393,22 @@ static void chat_step(void)
         } else {
             http_chat_emit_fail(http_chat_status_reason(chat.turn_status));
         }
-        if (chat.regression_mode) {
-            report_turn(chat.regression_turn + 1, chat.turn_status == HTTP_CHAT_OK,
-                http_chat_status_reason(chat.turn_status));
-            chat.regression_turn++;
-            if (chat.regression_turn >= (int)AKOYA_CHAT_REGRESSION_TURNS) {
-                if (chat.turn_failures == 0) {
-                    console_write_line("timed-gap-chat-regression: ALL PASS");
-                } else {
-                    console_write_line("timed-gap-chat-regression: FAILED");
-                }
-                chat.phase = CHAT_EXIT;
-                runtime_request_halt();
-            } else {
-                chat.phase = CHAT_GAP_WAIT;
-                chat.gap_ready = 0;
-                chat.gap_timer_handle = TIMER_HANDLE_INVALID;
-            }
-        } else {
-            chat.phase = CHAT_PROMPT;
-        }
-        return;
-    case CHAT_GAP_WAIT:
-        if (chat.gap_ready) {
-            chat_begin_turn(scheduled_message(chat.regression_turn));
-            chat.gap_ready = 0;
-            return;
-        }
-        if (chat.gap_timer_handle == TIMER_HANDLE_INVALID) {
-            console_write_prompt("> ");
-            chat.gap_timer_handle = timer_schedule(AKOYA_CHAT_REGRESSION_GAP_MS, gap_timer_done, 0);
-        }
+        chat.phase = CHAT_PROMPT;
         return;
     default:
         return;
     }
 }
 
-static void runtime_common_init(int regression)
+void net_async_start(void)
 {
     runtime_init();
     boot.phase = BOOT_LINK;
     boot.network_ok = 0;
-    boot.regression_mode = regression;
     chat.phase = CHAT_IDLE;
-    chat.turn_failures = 0;
-    chat.gap_timer_handle = TIMER_HANDLE_INVALID;
     http_chat_history_init(&chat.history);
 
     runtime_register_slot(boot_step, boot_active);
     runtime_register_slot(chat_step, chat_active);
-}
-
-void net_async_start(void)
-{
-    runtime_common_init(0);
-    runtime_run_until_halt();
-}
-
-void chat_regression_async_start(void)
-{
-    console_write_line("timed-gap-chat-regression: multi-turn chat regression runner");
-    runtime_common_init(1);
     runtime_run_until_halt();
 }

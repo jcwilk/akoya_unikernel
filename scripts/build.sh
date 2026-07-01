@@ -9,8 +9,8 @@ BUILD_DIR="${ROOT_DIR}/build"
 LOG_FILE="${BUILD_DIR}/build.log"
 KERNEL_BIN="${BUILD_DIR}/kernel.bin"
 TRANSPORT_BIN="${BUILD_DIR}/transport-test.bin"
-CHAT_REGRESSION_BIN="${BUILD_DIR}/chat-regression-test.bin"
 PROFILE_FILE="${ROOT_DIR}/target/akoya.profile"
+LWIP_DIR="${ROOT_DIR}/third_party/lwip"
 
 CC_PREFIX="${AKOYA_CROSS_PREFIX:-i686-elf-}"
 CC="${CC_PREFIX}gcc"
@@ -35,8 +35,6 @@ CHAT_MODEL="${AKOYA_CHAT_MODEL:-fast-text-qwen3-8b}"
 CHAT_TIMEOUT_MS="${AKOYA_CHAT_TIMEOUT_MS:-60000}"
 CHAT_PORT="${AKOYA_CHAT_PORT:-11435}"
 CHAT_MAX_TOKENS="${AKOYA_CHAT_MAX_TOKENS:-500}"
-CHAT_REGRESSION_TURNS="${AKOYA_CHAT_REGRESSION_TURNS:-3}"
-CHAT_REGRESSION_GAP_MS="${AKOYA_CHAT_REGRESSION_GAP_MS:-5000}"
 
 log() {
     printf '%s\n' "$*" | tee -a "${LOG_FILE}"
@@ -45,8 +43,8 @@ log() {
 emit_result() {
     local status="$1"
     local message="$2"
-    printf 'AKOYA_BUILD_RESULT=status=%s;kernel=%s;transport=%s;chat_regression=%s;log=%s;message=%s\n' \
-        "${status}" "${KERNEL_BIN}" "${TRANSPORT_BIN}" "${CHAT_REGRESSION_BIN}" "${LOG_FILE}" "${message}"
+    printf 'AKOYA_BUILD_RESULT=status=%s;kernel=%s;transport=%s;log=%s;message=%s\n' \
+        "${status}" "${KERNEL_BIN}" "${TRANSPORT_BIN}" "${LOG_FILE}" "${message}"
 }
 
 resolve_build_id() {
@@ -170,8 +168,11 @@ main() {
         -mtune=pentium-m
         -Wall
         -Wextra
+        -Wno-unused-parameter
         -O2
         -I"${ROOT_DIR}/kernel"
+        -I"${LWIP_DIR}/src/include"
+        -I"${ROOT_DIR}/kernel/net/lwip"
         -DAKOYA_BUILD_ID=\"${build_id}\"
         -DAKOYA_PROBE_TARGET_IP0="${probe_ip0}"
         -DAKOYA_PROBE_TARGET_IP1="${probe_ip1}"
@@ -188,8 +189,35 @@ main() {
         -DAKOYA_CHAT_TIMEOUT_MS="${CHAT_TIMEOUT_MS}"
         -DAKOYA_CHAT_PORT="${CHAT_PORT}"
         -DAKOYA_CHAT_MAX_TOKENS="${CHAT_MAX_TOKENS}"
-        -DAKOYA_CHAT_REGRESSION_TURNS="${CHAT_REGRESSION_TURNS}"
-        -DAKOYA_CHAT_REGRESSION_GAP_MS="${CHAT_REGRESSION_GAP_MS}U"
+    )
+
+    local lwip_sources=(
+        "${LWIP_DIR}/src/core/altcp.c"
+        "${LWIP_DIR}/src/core/altcp_alloc.c"
+        "${LWIP_DIR}/src/core/altcp_tcp.c"
+        "${LWIP_DIR}/src/core/def.c"
+        "${LWIP_DIR}/src/core/inet_chksum.c"
+        "${LWIP_DIR}/src/core/init.c"
+        "${LWIP_DIR}/src/core/ip.c"
+        "${LWIP_DIR}/src/core/mem.c"
+        "${LWIP_DIR}/src/core/memp.c"
+        "${LWIP_DIR}/src/core/netif.c"
+        "${LWIP_DIR}/src/core/pbuf.c"
+        "${LWIP_DIR}/src/core/raw.c"
+        "${LWIP_DIR}/src/core/stats.c"
+        "${LWIP_DIR}/src/core/sys.c"
+        "${LWIP_DIR}/src/core/tcp.c"
+        "${LWIP_DIR}/src/core/tcp_in.c"
+        "${LWIP_DIR}/src/core/tcp_out.c"
+        "${LWIP_DIR}/src/core/timeouts.c"
+        "${LWIP_DIR}/src/core/udp.c"
+        "${LWIP_DIR}/src/core/ipv4/dhcp.c"
+        "${LWIP_DIR}/src/core/ipv4/etharp.c"
+        "${LWIP_DIR}/src/core/ipv4/icmp.c"
+        "${LWIP_DIR}/src/core/ipv4/ip4.c"
+        "${LWIP_DIR}/src/core/ipv4/ip4_addr.c"
+        "${LWIP_DIR}/src/core/ipv4/ip4_frag.c"
+        "${LWIP_DIR}/src/netif/ethernet.c"
     )
 
     local shared_sources=(
@@ -207,6 +235,9 @@ main() {
         "${ROOT_DIR}/kernel/net/eth/rtl8139.c"
         "${ROOT_DIR}/kernel/net/eth/nic_device.c"
         "${ROOT_DIR}/kernel/net/link/link.c"
+        "${ROOT_DIR}/kernel/net/lwip/sys_arch.c"
+        "${ROOT_DIR}/kernel/net/lwip/lwip_pump.c"
+        "${ROOT_DIR}/kernel/net/lwip/libc_shim.c"
         "${ROOT_DIR}/kernel/net/ipv4/ipv4.c"
         "${ROOT_DIR}/kernel/net/dhcp/dhcp.c"
         "${ROOT_DIR}/kernel/net/icmp/icmp.c"
@@ -226,21 +257,20 @@ main() {
         "${ROOT_DIR}/kernel/transport_main.c"
     )
 
-    local chat_regression_only_sources=(
-        "${ROOT_DIR}/kernel/net/http/http_chat.c"
-        "${ROOT_DIR}/kernel/net/net_async.c"
-        "${ROOT_DIR}/kernel/input/ps2_keyboard.c"
-        "${ROOT_DIR}/kernel/input/ps2_readline.c"
-        "${ROOT_DIR}/kernel/chat_regression_entry.c"
-    )
-
     local shared_objects=()
     local kernel_objects=()
     local transport_objects=()
-    local chat_regression_objects=()
     local source object base
 
     log "Compiling with ${CC} (memory limit ${MEM_LIMIT_MB} MB)"
+    for source in "${lwip_sources[@]}"; do
+        base="$(basename "${source}")"
+        base="${base%.*}"
+        object="${BUILD_DIR}/lwip-${base}.o"
+        shared_objects+=("${object}")
+        compile_source "${source}" "${object}"
+    done
+
     for source in "${shared_sources[@]}"; do
         base="$(basename "${source}")"
         base="${base%.*}"
@@ -265,22 +295,11 @@ main() {
         compile_source "${source}" "${object}"
     done
 
-    for source in "${chat_regression_only_sources[@]}"; do
-        base="$(basename "${source}")"
-        base="${base%.*}"
-        object="${BUILD_DIR}/chat-regression-${base}.o"
-        chat_regression_objects+=("${object}")
-        compile_source "${source}" "${object}"
-    done
-
     link_image "${BUILD_DIR}/kernel.elf" "${KERNEL_BIN}" \
         "${shared_objects[@]}" "${kernel_objects[@]}"
 
     link_image "${BUILD_DIR}/transport-test.elf" "${TRANSPORT_BIN}" \
         "${shared_objects[@]}" "${transport_objects[@]}"
-
-    link_image "${BUILD_DIR}/chat-regression-test.elf" "${CHAT_REGRESSION_BIN}" \
-        "${shared_objects[@]}" "${chat_regression_objects[@]}"
 
     emit_result "success" "build-complete"
 }

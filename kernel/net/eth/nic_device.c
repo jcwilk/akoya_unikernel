@@ -1,8 +1,10 @@
 #include "net/eth/nic_device.h"
 
 #include "arch/irq.h"
+#include "net/dhcp/dhcp.h"
 #include "net/eth/rtl8139.h"
 #include "net/link/link.h"
+#include "net/lwip/lwip_pump.h"
 
 static eth_device_t *nic;
 static deferred_device_t nic_dev;
@@ -14,7 +16,11 @@ static int nic_has_more(void)
 
 static void nic_drain_one(void)
 {
-    link_drain_rx(1);
+    if (dhcp_link_rx_active()) {
+        link_drain_rx(1);
+    } else {
+        lwip_stack_pump(1);
+    }
 }
 
 static void nic_mask_irq(void)

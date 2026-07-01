@@ -7,7 +7,7 @@ clean:
 	@rm -rf build
 
 test: build
-	@bash scripts/run-chat-regression-test.sh
+	@bash scripts/run-test.sh
 
 run: build
 	@bash scripts/run-qemu.sh --headful

@@ -5,7 +5,7 @@
 #include "net/eth/eth.h"
 #include "net/icmp/icmp.h"
 #include "net/ipv4/ipv4.h"
-#include "net/link/link.h"
+#include "net/lwip/lwip_pump.h"
 #include "net/tcp/tcp.h"
 #include "time/time.h"
 
@@ -153,7 +153,6 @@ static int transport_network_bootstrap(ipv4_addr_t *chat_host_out)
         return 0;
     }
 
-    ipv4_set_config(&config);
     console_write("net_ip=");
     console_write_ipv4(config.address);
     console_write_line("");
@@ -161,18 +160,14 @@ static int transport_network_bootstrap(ipv4_addr_t *chat_host_out)
     if (ipv4_is_zero(config.gateway)) {
         config.gateway = config.address;
         config.gateway.bytes[3] = 254U;
-        ipv4_set_config(&config);
     }
 
-    link_announce_ipv4(config.address);
+    lwip_stack_apply_ipv4_config(&config);
+    ipv4_set_config(&config);
+
     for (int i = 0; i < 100; i++) {
-        link_poll();
+        lwip_stack_pump(1);
         time_delay_ms(10U);
-    }
-
-    if (!ipv4_is_zero(config.gateway)) {
-        eth_addr_t gw_mac;
-        (void)link_resolve_ipv4(config.gateway, &gw_mac, 3000U);
     }
 
     ipv4_addr_t target = chat_host_ip();

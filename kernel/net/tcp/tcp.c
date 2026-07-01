@@ -1,216 +1,80 @@
 #include "net/tcp/tcp.h"
 
-#include "net/ipv4/ipv4.h"
-#include "net/eth/eth.h"
-#include "net/link/link.h"
+#include "lwip/altcp.h"
+#include "lwip/altcp_tcp.h"
+#include "lwip/ip4_addr.h"
+#include "lwip/ip_addr.h"
+#include "lwip/tcp.h"
+#include "net/lwip/lwip_pump.h"
 #include "time/time.h"
-
-#define TCP_PROTO 6U
-
-#define TCP_FLAG_FIN 0x01U
-#define TCP_FLAG_SYN 0x02U
-#define TCP_FLAG_RST 0x04U
-#define TCP_FLAG_PSH 0x08U
-#define TCP_FLAG_ACK 0x10U
 
 #define TCP_POST_BODY_DRAIN_MS 2000U
 
-struct tcp_header {
-    uint16_t src_port;
-    uint16_t dst_port;
-    uint32_t seq;
-    uint32_t ack;
-    uint8_t offset_reserved;
-    uint8_t flags;
-    uint16_t window;
-    uint16_t checksum;
-    uint16_t urgent;
-} __attribute__((packed));
-
-struct tcp_pseudo {
-    uint8_t src[4];
-    uint8_t dst[4];
-    uint8_t zero;
-    uint8_t protocol;
-    uint16_t length;
-} __attribute__((packed));
-
+static struct altcp_pcb *conn_pcb;
 static ipv4_addr_t conn_remote_ip;
 static uint16_t conn_local_port;
 static uint16_t conn_remote_port;
-static uint32_t conn_seq;
-static uint32_t conn_ack;
 static int conn_established;
-static int conn_remote_fin;
+static int conn_remote_closed;
 static int conn_our_fin_sent;
 static int conn_reset;
 static uint8_t *recv_buf;
 static uint16_t recv_cap;
 static uint16_t recv_len;
-static uint16_t next_local_port = 0;
-static int handler_registered;
+static uint16_t next_local_port;
 
-static uint16_t tcp_checksum(ipv4_addr_t src, ipv4_addr_t dst, const uint8_t *tcp, uint16_t length)
+static void tcp_pump(void)
 {
-    uint8_t block[12 + 1500];
-    struct tcp_pseudo *pseudo = (struct tcp_pseudo *)block;
-
-    pseudo->src[0] = src.bytes[0];
-    pseudo->src[1] = src.bytes[1];
-    pseudo->src[2] = src.bytes[2];
-    pseudo->src[3] = src.bytes[3];
-    pseudo->dst[0] = dst.bytes[0];
-    pseudo->dst[1] = dst.bytes[1];
-    pseudo->dst[2] = dst.bytes[2];
-    pseudo->dst[3] = dst.bytes[3];
-    pseudo->zero = 0;
-    pseudo->protocol = TCP_PROTO;
-    pseudo->length = net_be16(length);
-
-    if ((uint32_t)length + sizeof(struct tcp_pseudo) > sizeof(block)) {
-        return 0;
-    }
-
-    for (uint16_t i = 0; i < length; i++) {
-        block[sizeof(struct tcp_pseudo) + i] = tcp[i];
-    }
-
-    return ipv4_checksum(block, (int)(sizeof(struct tcp_pseudo) + length));
+    lwip_stack_pump(8);
 }
 
-static int tcp_send_segment(uint8_t flags, const uint8_t *payload, uint16_t payload_len)
+static err_t tcp_connected_cb(void *arg, struct altcp_pcb *pcb, err_t err)
 {
-    const ipv4_config_t *cfg = ipv4_get_config();
-    if (cfg == 0) {
-        return -1;
-    }
+    (void)arg;
+    (void)pcb;
 
-    uint8_t packet[1500];
-    struct tcp_header *tcp = (struct tcp_header *)packet;
-    uint16_t tcp_len = (uint16_t)(sizeof(struct tcp_header) + payload_len);
-
-    if (tcp_len > sizeof(packet)) {
-        return -1;
-    }
-
-    tcp->src_port = net_be16(conn_local_port);
-    tcp->dst_port = net_be16(conn_remote_port);
-    tcp->seq = net_be32(conn_seq);
-    tcp->ack = net_be32(conn_ack);
-    tcp->offset_reserved = (uint8_t)(5U << 4);
-    tcp->flags = flags;
-    tcp->window = net_be16(8192U);
-    tcp->checksum = 0;
-    tcp->urgent = 0;
-
-    for (uint16_t i = 0; i < payload_len; i++) {
-        packet[sizeof(struct tcp_header) + i] = payload[i];
-    }
-
-    uint16_t csum = tcp_checksum(cfg->address, conn_remote_ip, packet, tcp_len);
-    tcp->checksum = net_be16(csum);
-
-    return ipv4_send(conn_remote_ip, packet, tcp_len, TCP_PROTO);
-}
-
-static void tcp_ipv4_handler(const uint8_t *packet, uint16_t length, void *ctx)
-{
-    (void)ctx;
-
-    if (length < 40) {
-        return;
-    }
-
-    if (packet[9] != TCP_PROTO) {
-        return;
-    }
-
-    uint8_t ihl = (uint8_t)((packet[0] & 0x0FU) * 4U);
-    if (length < ihl + sizeof(struct tcp_header)) {
-        return;
-    }
-
-    const struct tcp_header *tcp = (const struct tcp_header *)(packet + ihl);
-    uint16_t src_port = net_be16(tcp->src_port);
-    uint16_t dst_port = net_be16(tcp->dst_port);
-
-    if (src_port != conn_remote_port || dst_port != conn_local_port) {
-        return;
-    }
-
-    ipv4_addr_t src_ip;
-    src_ip.bytes[0] = packet[12];
-    src_ip.bytes[1] = packet[13];
-    src_ip.bytes[2] = packet[14];
-    src_ip.bytes[3] = packet[15];
-
-    if (!ipv4_equal(src_ip, conn_remote_ip)) {
-        return;
-    }
-
-    uint8_t data_offset = (uint8_t)((tcp->offset_reserved >> 4) * 4U);
-    if (data_offset < sizeof(struct tcp_header)) {
-        return;
-    }
-
-    uint16_t ip_total = (uint16_t)((packet[2] << 8) | packet[3]);
-    if (ip_total < ihl + data_offset) {
-        return;
-    }
-
-    uint16_t payload_len = (uint16_t)(ip_total - ihl - data_offset);
-    const uint8_t *payload = packet + ihl + data_offset;
-    uint32_t seq = net_be32(tcp->seq);
-    uint8_t flags = tcp->flags;
-
-    if (flags & TCP_FLAG_RST) {
+    if (err == ERR_OK) {
+        conn_established = 1;
+    } else {
         conn_reset = 1;
-        return;
     }
-
-    if ((flags & (TCP_FLAG_SYN | TCP_FLAG_ACK)) == (TCP_FLAG_SYN | TCP_FLAG_ACK)) {
-        if (!conn_established) {
-            conn_ack = seq + 1U;
-            conn_established = 1;
-        }
-    }
-
-    if (payload_len > 0 && conn_established) {
-        if (seq == conn_ack) {
-            if (recv_buf != 0) {
-                uint16_t space = (recv_cap > recv_len) ? (uint16_t)(recv_cap - recv_len) : 0;
-                uint16_t copy = (payload_len < space) ? payload_len : space;
-                for (uint16_t i = 0; i < copy; i++) {
-                    recv_buf[recv_len + i] = payload[i];
-                }
-                recv_len = (uint16_t)(recv_len + copy);
-            }
-            conn_ack = seq + payload_len;
-            (void)tcp_send_segment(TCP_FLAG_ACK, 0, 0);
-        }
-    }
-
-    if (flags & TCP_FLAG_FIN) {
-        conn_remote_fin = 1;
-        conn_ack = seq + 1U + payload_len;
-        (void)tcp_send_segment(TCP_FLAG_ACK, 0, 0);
-    }
+    return ERR_OK;
 }
 
-static tcp_status_t tcp_wait_until(uint32_t deadline, int (*predicate)(void))
+static err_t tcp_recv_cb(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t err)
 {
-    while (time_millis() < deadline) {
-        link_poll();
-        if (predicate()) {
-            return TCP_OK;
+    (void)arg;
+
+    if (p == 0) {
+        conn_remote_closed = 1;
+        return ERR_OK;
+    }
+
+    if (err != ERR_OK) {
+        pbuf_free(p);
+        return err;
+    }
+
+    if (recv_buf != 0) {
+        uint16_t space = (recv_cap > recv_len) ? (uint16_t)(recv_cap - recv_len) : 0;
+        uint16_t copy = (p->tot_len < space) ? p->tot_len : space;
+        if (copy > 0) {
+            pbuf_copy_partial(p, recv_buf + recv_len, copy, 0);
+            recv_len = (uint16_t)(recv_len + copy);
         }
     }
-    return TCP_FAIL_TIMEOUT;
+
+    altcp_recved(pcb, p->tot_len);
+    pbuf_free(p);
+    return ERR_OK;
 }
 
-static int predicate_syn_ack(void)
+static void tcp_err_cb(void *arg, err_t err)
 {
-    return conn_established || conn_reset;
+    (void)arg;
+    (void)err;
+    conn_reset = 1;
+    conn_pcb = 0;
 }
 
 static uint32_t tcp_entropy32(void)
@@ -242,22 +106,6 @@ static uint16_t tcp_alloc_local_port(void)
     return port;
 }
 
-static void tcp_register_handler(void)
-{
-    if (!handler_registered) {
-        link_register_ipv4_handler(tcp_ipv4_handler, 0);
-        handler_registered = 1;
-    }
-}
-
-static void tcp_unregister_handler(void)
-{
-    if (handler_registered) {
-        link_register_ipv4_handler(0, 0);
-        handler_registered = 0;
-    }
-}
-
 static void tcp_reset_flow_state(void)
 {
     conn_remote_ip.bytes[0] = 0;
@@ -266,15 +114,66 @@ static void tcp_reset_flow_state(void)
     conn_remote_ip.bytes[3] = 0;
     conn_local_port = 0;
     conn_remote_port = 0;
-    conn_seq = 0;
-    conn_ack = 0;
     conn_established = 0;
-    conn_remote_fin = 0;
+    conn_remote_closed = 0;
     conn_our_fin_sent = 0;
     conn_reset = 0;
     recv_buf = 0;
     recv_cap = 0;
     recv_len = 0;
+}
+
+static void tcp_free_pcb(void)
+{
+    if (conn_pcb != 0) {
+        altcp_arg(conn_pcb, 0);
+        altcp_recv(conn_pcb, 0);
+        altcp_err(conn_pcb, 0);
+        altcp_abort(conn_pcb);
+        conn_pcb = 0;
+    }
+}
+
+static int tcp_begin_connect(ipv4_addr_t dest, uint16_t dest_port)
+{
+    altcp_allocator_t allocator;
+    ip4_addr_t ip4;
+    ip_addr_t addr;
+
+    tcp_free_pcb();
+    tcp_reset_flow_state();
+
+    lwip_stack_arp_prime(dest);
+
+    allocator.alloc = altcp_tcp_alloc;
+    allocator.arg = 0;
+    conn_pcb = altcp_new(&allocator);
+    if (conn_pcb == 0) {
+        return -1;
+    }
+
+    altcp_arg(conn_pcb, 0);
+    altcp_recv(conn_pcb, tcp_recv_cb);
+    altcp_err(conn_pcb, tcp_err_cb);
+
+    conn_remote_ip = dest;
+    conn_remote_port = dest_port;
+    conn_local_port = tcp_alloc_local_port();
+
+    if (altcp_bind(conn_pcb, IP_ADDR_ANY, conn_local_port) != ERR_OK) {
+        tcp_free_pcb();
+        return -1;
+    }
+
+    ipv4_to_lwip_addr(dest, &ip4);
+    ip_addr_copy_from_ip4(addr, ip4);
+
+    if (altcp_connect(conn_pcb, &addr, dest_port, tcp_connected_cb) != ERR_OK) {
+        tcp_free_pcb();
+        return -1;
+    }
+
+    return 0;
 }
 
 static void tcp_end_recv(void)
@@ -283,48 +182,76 @@ static void tcp_end_recv(void)
     recv_cap = 0;
 }
 
-static void tcp_drain_link(void)
+static void tcp_drain_stack(void)
 {
-    eth_device_t *dev = link_device();
-    if (dev != 0) {
-        eth_drain_tx(dev);
+    tcp_pump();
+}
+
+static tcp_status_t tcp_wait_until(uint32_t deadline, int (*predicate)(void))
+{
+    while (time_millis() < deadline) {
+        tcp_pump();
+        if (predicate()) {
+            return TCP_OK;
+        }
     }
-    link_drain_rx(0);
+    return TCP_FAIL_TIMEOUT;
+}
+
+static int predicate_connected(void)
+{
+    return conn_established || conn_reset;
+}
+
+static void tcp_begin_recv(uint8_t *buf, uint16_t cap, uint16_t *len_out)
+{
+    recv_buf = buf;
+    recv_cap = cap;
+    recv_len = 0;
+    conn_remote_closed = 0;
+
+    if (len_out != 0) {
+        *len_out = 0;
+    }
 }
 
 static void tcp_quiesce_connection(uint32_t deadline_ms)
 {
-    if (!conn_established || conn_reset) {
+    if (!conn_established || conn_reset || conn_pcb == 0) {
         return;
     }
 
     uint32_t deadline = time_millis() + deadline_ms;
 
     if (!conn_our_fin_sent) {
-        (void)tcp_send_segment((uint8_t)(TCP_FLAG_FIN | TCP_FLAG_ACK), 0, 0);
-        conn_seq++;
-        conn_our_fin_sent = 1;
+        if (altcp_close(conn_pcb) == ERR_OK) {
+            conn_our_fin_sent = 1;
+            conn_pcb = 0;
+        } else {
+            altcp_shutdown(conn_pcb, 0, 1);
+            conn_our_fin_sent = 1;
+        }
     }
 
     while (time_millis() < deadline) {
-        link_poll();
+        tcp_pump();
         if (conn_reset) {
             break;
         }
-        if (conn_remote_fin && conn_our_fin_sent) {
+        if (conn_remote_closed && conn_our_fin_sent) {
             break;
         }
     }
 
-    tcp_drain_link();
+    tcp_drain_stack();
 }
 
 int tcp_transport_inactive(void)
 {
-    return !handler_registered
+    return conn_pcb == 0
         && !conn_established
         && !conn_reset
-        && !conn_remote_fin
+        && !conn_remote_closed
         && !conn_our_fin_sent
         && recv_buf == 0
         && recv_len == 0
@@ -335,8 +262,8 @@ int tcp_transport_inactive(void)
 
 void tcp_transport_release(void)
 {
-    tcp_unregister_handler();
-    link_drain_rx(0);
+    tcp_free_pcb();
+    tcp_drain_stack();
     tcp_reset_flow_state();
 }
 
@@ -348,7 +275,7 @@ int tcp_drain_until_inactive(uint32_t timeout_ms)
         if (tcp_transport_inactive()) {
             return 1;
         }
-        link_poll();
+        tcp_pump();
     }
 
     return tcp_transport_inactive();
@@ -362,23 +289,10 @@ int tcp_chat_drain_until_inactive(uint32_t timeout_ms)
         if (tcp_transport_inactive()) {
             return 1;
         }
-        link_poll();
+        tcp_pump();
     }
 
     return tcp_transport_inactive() ? 1 : 0;
-}
-
-static void tcp_begin_recv(uint8_t *buf, uint16_t cap, uint16_t *len_out)
-{
-    recv_buf = buf;
-    recv_cap = cap;
-    recv_len = 0;
-    conn_remote_fin = 0;
-    conn_reset = 0;
-
-    if (len_out != 0) {
-        *len_out = 0;
-    }
 }
 
 tcp_status_t tcp_session_open(
@@ -391,51 +305,22 @@ tcp_status_t tcp_session_open(
         return TCP_FAIL_CONNECT;
     }
 
-    conn_remote_ip = dest;
-    conn_remote_port = dest_port;
-    conn_local_port = tcp_alloc_local_port();
-    conn_seq = time_millis();
-    conn_ack = 0;
-    conn_established = 0;
-    conn_remote_fin = 0;
-    conn_our_fin_sent = 0;
-    conn_reset = 0;
-    recv_buf = 0;
-    recv_cap = 0;
-    recv_len = 0;
-
-    link_drain_rx(0);
-    tcp_register_handler();
-
-    uint32_t deadline = time_millis() + timeout_ms;
-
-    if (tcp_send_segment(TCP_FLAG_SYN, 0, 0) != 0) {
-        tcp_unregister_handler();
-        tcp_reset_flow_state();
+    if (tcp_begin_connect(dest, dest_port) != 0) {
         session->open = 0;
         return TCP_FAIL_CONNECT;
     }
-    conn_seq++;
 
-    if (tcp_wait_until(deadline, predicate_syn_ack) != TCP_OK) {
-        tcp_unregister_handler();
-        tcp_reset_flow_state();
+    uint32_t deadline = time_millis() + timeout_ms;
+    if (tcp_wait_until(deadline, predicate_connected) != TCP_OK) {
+        tcp_transport_release();
         session->open = 0;
         return TCP_FAIL_TIMEOUT;
     }
 
     if (conn_reset || !conn_established) {
-        tcp_unregister_handler();
-        tcp_reset_flow_state();
+        tcp_transport_release();
         session->open = 0;
         return TCP_FAIL_CONNECT;
-    }
-
-    if (tcp_send_segment(TCP_FLAG_ACK, 0, 0) != 0) {
-        tcp_unregister_handler();
-        tcp_reset_flow_state();
-        session->open = 0;
-        return TCP_FAIL_SEND;
     }
 
     session->open = 1;
@@ -444,7 +329,7 @@ tcp_status_t tcp_session_open(
 
 tcp_status_t tcp_session_send(tcp_session_t *session, const uint8_t *data, uint16_t len)
 {
-    if (session == 0 || !session->open || !conn_established || conn_reset) {
+    if (session == 0 || !session->open || !conn_established || conn_reset || conn_pcb == 0) {
         return TCP_FAIL_SEND;
     }
 
@@ -452,12 +337,15 @@ tcp_status_t tcp_session_send(tcp_session_t *session, const uint8_t *data, uint1
         return TCP_OK;
     }
 
-    if (tcp_send_segment((uint8_t)(TCP_FLAG_ACK | TCP_FLAG_PSH), data, len) != 0) {
+    if (altcp_write(conn_pcb, data, len, TCP_WRITE_FLAG_COPY) != ERR_OK) {
         return TCP_FAIL_SEND;
     }
 
-    conn_seq += len;
-    tcp_drain_link();
+    if (altcp_output(conn_pcb) != ERR_OK) {
+        return TCP_FAIL_SEND;
+    }
+
+    tcp_drain_stack();
     return TCP_OK;
 }
 
@@ -481,7 +369,7 @@ tcp_status_t tcp_session_recv_until(
     uint32_t body_complete_deadline = 0;
 
     while (time_millis() < deadline) {
-        link_poll();
+        tcp_pump();
 
         if (conn_reset) {
             if (len_out != 0) {
@@ -489,8 +377,7 @@ tcp_status_t tcp_session_recv_until(
             }
             tcp_end_recv();
             session->open = 0;
-            tcp_unregister_handler();
-            tcp_reset_flow_state();
+            tcp_transport_release();
             return TCP_FAIL_RECV;
         }
 
@@ -501,7 +388,7 @@ tcp_status_t tcp_session_recv_until(
         }
 
         if (body_complete) {
-            if (conn_remote_fin || conn_reset) {
+            if (conn_remote_closed || conn_reset) {
                 if (len_out != 0) {
                     *len_out = recv_len;
                 }
@@ -516,7 +403,7 @@ tcp_status_t tcp_session_recv_until(
             continue;
         }
 
-        if (conn_remote_fin) {
+        if (conn_remote_closed) {
             if (len_out != 0) {
                 *len_out = recv_len;
             }
@@ -540,22 +427,23 @@ void tcp_session_close(tcp_session_t *session)
 
         uint32_t deadline = time_millis() + TCP_CLOSE_DRAIN_MS;
         while (time_millis() < deadline) {
-            link_poll();
-            if (conn_reset || (conn_our_fin_sent && conn_remote_fin)) {
+            tcp_pump();
+            if (conn_reset || (conn_our_fin_sent && conn_remote_closed)) {
                 break;
             }
         }
 
-        if (conn_established && !conn_reset && !(conn_our_fin_sent && conn_remote_fin)) {
-            (void)tcp_send_segment(TCP_FLAG_RST | TCP_FLAG_ACK, 0, 0);
+        if (conn_established && !conn_reset && !(conn_our_fin_sent && conn_remote_closed) && conn_pcb != 0) {
+            altcp_abort(conn_pcb);
+            conn_pcb = 0;
             conn_reset = 1;
-            tcp_drain_link();
+            tcp_drain_stack();
         }
     } else if (session == 0) {
         tcp_quiesce_connection(TCP_CLOSE_DRAIN_MS);
     }
 
-    tcp_drain_link();
+    tcp_drain_stack();
     tcp_transport_release();
 
     if (session != 0) {
@@ -672,40 +560,21 @@ int tcp_sm_step(tcp_sm_t *sm)
     }
     case TCP_SM_OPEN: {
         if (!sm->open_syn_sent) {
-            conn_remote_ip = sm->dest;
-            conn_remote_port = sm->dest_port;
-            conn_local_port = tcp_alloc_local_port();
-            conn_seq = time_millis();
-            conn_ack = 0;
-            conn_established = 0;
-            conn_remote_fin = 0;
-            conn_our_fin_sent = 0;
-            conn_reset = 0;
-            recv_buf = 0;
-            recv_cap = 0;
-            recv_len = 0;
-
-            link_drain_rx(0);
-            tcp_register_handler();
-
-            if (tcp_send_segment(TCP_FLAG_SYN, 0, 0) != 0) {
+            if (tcp_begin_connect(sm->dest, sm->dest_port) != 0) {
                 sm->result = TCP_FAIL_CONNECT;
-                tcp_unregister_handler();
-                tcp_reset_flow_state();
+                tcp_transport_release();
                 sm->state = TCP_SM_POST_DRAIN;
                 sm->deadline_ms = time_millis() + TCP_CLOSE_DRAIN_MS;
                 sm->chat_drain = 1;
                 return 0;
             }
-            conn_seq++;
             sm->open_syn_sent = 1;
             return 0;
         }
 
         if (conn_reset) {
             sm->result = TCP_FAIL_CONNECT;
-            tcp_unregister_handler();
-            tcp_reset_flow_state();
+            tcp_transport_release();
             sm->state = TCP_SM_POST_DRAIN;
             sm->deadline_ms = time_millis() + TCP_CLOSE_DRAIN_MS;
             sm->chat_drain = 1;
@@ -715,21 +584,12 @@ int tcp_sm_step(tcp_sm_t *sm)
         if (!conn_established) {
             if (time_millis() >= sm->deadline_ms) {
                 sm->result = TCP_FAIL_TIMEOUT;
-                tcp_unregister_handler();
-                tcp_reset_flow_state();
+                tcp_transport_release();
                 sm->state = TCP_SM_POST_DRAIN;
                 sm->deadline_ms = time_millis() + TCP_CLOSE_DRAIN_MS;
                 sm->chat_drain = 1;
             }
             return 0;
-        }
-
-        if (tcp_send_segment(TCP_FLAG_ACK, 0, 0) != 0) {
-            sm->result = TCP_FAIL_SEND;
-            tcp_unregister_handler();
-            tcp_reset_flow_state();
-            sm->state = TCP_SM_DONE;
-            return 1;
         }
 
         sm->session.open = 1;
@@ -769,14 +629,14 @@ int tcp_sm_step(tcp_sm_t *sm)
         }
 
         if (sm->body_complete) {
-            if (conn_remote_fin || conn_reset || time_millis() >= sm->body_complete_deadline) {
+            if (conn_remote_closed || conn_reset || time_millis() >= sm->body_complete_deadline) {
                 sm->state = TCP_SM_DONE;
                 return 1;
             }
             return 0;
         }
 
-        if (conn_remote_fin) {
+        if (conn_remote_closed) {
             sm->recv_len = recv_len;
             tcp_end_recv();
             sm->session.open = 0;
@@ -794,12 +654,16 @@ int tcp_sm_step(tcp_sm_t *sm)
     }
     case TCP_SM_CLOSE: {
         if (sm->session.open || conn_established) {
-            if (!conn_our_fin_sent) {
-                (void)tcp_send_segment((uint8_t)(TCP_FLAG_FIN | TCP_FLAG_ACK), 0, 0);
-                conn_seq++;
-                conn_our_fin_sent = 1;
+            if (!conn_our_fin_sent && conn_pcb != 0) {
+                if (altcp_close(conn_pcb) == ERR_OK) {
+                    conn_our_fin_sent = 1;
+                    conn_pcb = 0;
+                } else {
+                    altcp_shutdown(conn_pcb, 0, 1);
+                    conn_our_fin_sent = 1;
+                }
             }
-            if (conn_reset || (conn_our_fin_sent && conn_remote_fin)) {
+            if (conn_reset || (conn_our_fin_sent && conn_remote_closed)) {
                 tcp_transport_release();
                 sm->session.open = 0;
                 sm->state = TCP_SM_POST_DRAIN;
@@ -808,8 +672,9 @@ int tcp_sm_step(tcp_sm_t *sm)
                 return 0;
             }
             if (time_millis() >= sm->deadline_ms) {
-                if (conn_established && !conn_reset) {
-                    (void)tcp_send_segment(TCP_FLAG_RST | TCP_FLAG_ACK, 0, 0);
+                if (conn_pcb != 0) {
+                    altcp_abort(conn_pcb);
+                    conn_pcb = 0;
                 }
                 tcp_transport_release();
                 sm->session.open = 0;

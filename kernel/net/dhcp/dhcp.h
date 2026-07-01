@@ -27,4 +27,6 @@ int dhcp_sm_done(const dhcp_sm_t *sm);
 dhcp_status_t dhcp_sm_result(const dhcp_sm_t *sm);
 const ipv4_config_t *dhcp_sm_config(const dhcp_sm_t *sm);
 
+int dhcp_link_rx_active(void);
+
 #endif

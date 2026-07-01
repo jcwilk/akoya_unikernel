@@ -3,6 +3,7 @@
 #include "net/eth/eth.h"
 #include "net/link/link.h"
 #include "net/ipv4/ipv4.h"
+#include "net/lwip/lwip_pump.h"
 #include "time/time.h"
 
 #include <stddef.h>
@@ -40,6 +41,31 @@ static ipv4_config_t offered_config;
 static ipv4_addr_t dhcp_server_id;
 static int offer_received;
 static int ack_received;
+static int link_rx_active;
+
+int dhcp_link_rx_active(void)
+{
+    return link_rx_active;
+}
+
+void dhcp_finish_link_rx(void)
+{
+    link_rx_active = 0;
+}
+
+static void dhcp_apply_config(const ipv4_config_t *config)
+{
+    eth_device_t *dev = link_device();
+
+    if (dev != 0 && lwip_stack_device() == 0) {
+        lwip_stack_init(dev);
+    }
+
+    if (config != 0) {
+        lwip_stack_apply_ipv4_config(config);
+        ipv4_set_config(config);
+    }
+}
 
 static void write_u32(uint8_t *buffer, uint32_t value)
 {
@@ -295,6 +321,7 @@ dhcp_status_t dhcp_acquire(ipv4_config_t *config_out, uint32_t timeout_ms)
     dhcp_server_id.bytes[2] = 0;
     dhcp_server_id.bytes[3] = 0;
     transaction_id = (uint32_t)(time_millis() | 0x01000000U);
+    link_rx_active = 1;
 
     link_register_ipv4_handler(dhcp_ipv4_handler, 0);
 
@@ -302,6 +329,7 @@ dhcp_status_t dhcp_acquire(ipv4_config_t *config_out, uint32_t timeout_ms)
     while (time_millis() < deadline && !offer_received) {
         if (send_dhcp(1, config_out->address) != 0) {
             link_register_ipv4_handler(0, 0);
+            dhcp_finish_link_rx();
             return DHCP_FAIL_TIMEOUT;
         }
 
@@ -313,6 +341,7 @@ dhcp_status_t dhcp_acquire(ipv4_config_t *config_out, uint32_t timeout_ms)
 
     if (!offer_received) {
         link_register_ipv4_handler(0, 0);
+        dhcp_finish_link_rx();
         return DHCP_FAIL_NO_OFFER;
     }
 
@@ -321,6 +350,7 @@ dhcp_status_t dhcp_acquire(ipv4_config_t *config_out, uint32_t timeout_ms)
     while (time_millis() < deadline && !ack_received) {
         if (send_dhcp(3, offered_config.address) != 0) {
             link_register_ipv4_handler(0, 0);
+            dhcp_finish_link_rx();
             return DHCP_FAIL_TIMEOUT;
         }
 
@@ -333,10 +363,13 @@ dhcp_status_t dhcp_acquire(ipv4_config_t *config_out, uint32_t timeout_ms)
     link_register_ipv4_handler(0, 0);
 
     if (!ack_received) {
+        dhcp_finish_link_rx();
         return DHCP_FAIL_NO_ACK;
     }
 
     *config_out = offered_config;
+    dhcp_apply_config(config_out);
+    dhcp_finish_link_rx();
     return DHCP_OK;
 }
 
@@ -362,6 +395,7 @@ void dhcp_sm_begin(dhcp_sm_t *sm, uint32_t timeout_ms)
     sm->deadline_ms = time_millis() + timeout_ms;
     sm->poll_until_ms = 0;
     sm->result = DHCP_OK;
+    link_rx_active = 1;
 
     link_register_ipv4_handler(dhcp_ipv4_handler, 0);
 }
@@ -391,6 +425,7 @@ int dhcp_sm_step(dhcp_sm_t *sm)
     if (now >= sm->deadline_ms) {
         sm->result = sm->phase < 2 ? DHCP_FAIL_NO_OFFER : DHCP_FAIL_NO_ACK;
         link_unregister_ipv4_handler(dhcp_ipv4_handler, 0);
+        dhcp_finish_link_rx();
         sm->active = 0;
         return 1;
     }
@@ -400,11 +435,13 @@ int dhcp_sm_step(dhcp_sm_t *sm)
             if (send_dhcp(1, sm->config.address) != 0) {
                 sm->result = DHCP_FAIL_TIMEOUT;
                 link_unregister_ipv4_handler(dhcp_ipv4_handler, 0);
+                dhcp_finish_link_rx();
                 sm->active = 0;
                 return 1;
             }
             sm->poll_until_ms = now + 1000U;
         }
+        link_poll();
         if (offer_received) {
             sm->phase = 1;
             ack_received = 0;
@@ -418,21 +455,26 @@ int dhcp_sm_step(dhcp_sm_t *sm)
             if (send_dhcp(3, offered_config.address) != 0) {
                 sm->result = DHCP_FAIL_TIMEOUT;
                 link_unregister_ipv4_handler(dhcp_ipv4_handler, 0);
+                dhcp_finish_link_rx();
                 sm->active = 0;
                 return 1;
             }
             sm->poll_until_ms = now + 1000U;
         }
+        link_poll();
         if (ack_received) {
             sm->config = offered_config;
             sm->result = DHCP_OK;
             link_unregister_ipv4_handler(dhcp_ipv4_handler, 0);
+            dhcp_apply_config(&sm->config);
+            dhcp_finish_link_rx();
             sm->active = 0;
             return 1;
         }
         return 0;
     }
 
+    dhcp_finish_link_rx();
     sm->active = 0;
     return 1;
 }

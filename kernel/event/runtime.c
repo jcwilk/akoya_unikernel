@@ -2,6 +2,9 @@
 
 #include "arch/irq.h"
 #include "event/device.h"
+#include "net/dhcp/dhcp.h"
+#include "net/link/link.h"
+#include "net/lwip/lwip_pump.h"
 #include "time/timer.h"
 #include "time/time.h"
 
@@ -96,6 +99,12 @@ int runtime_pump_once(void)
     device_poll_registered();
     timer_poll();
     runtime_service_devices();
+
+    if (dhcp_link_rx_active()) {
+        link_poll();
+    } else {
+        lwip_stack_pump(8);
+    }
 
     for (int i = 0; i < slot_count; i++) {
         if (slots[i].active == 0 || slots[i].active()) {

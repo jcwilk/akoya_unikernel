@@ -7,6 +7,7 @@
 #include "net/icmp/icmp.h"
 #include "net/ipv4/ipv4.h"
 #include "net/link/link.h"
+#include "net/lwip/lwip_pump.h"
 #include "time/time.h"
 
 #ifndef AKOYA_CHAT_HOST_IP0
@@ -62,6 +63,7 @@ void net_bootstrap(void)
     }
 
     link_init(&nic);
+
     console_write_line("net_link=ok");
 
     time_delay_ms(500U);
@@ -87,27 +89,9 @@ void net_bootstrap(void)
         return;
     }
 
-    ipv4_set_config(&config);
     console_write("net_ip=");
     console_write_ipv4(config.address);
     console_write_line("");
-
-    if (ipv4_is_zero(config.gateway)) {
-        config.gateway = config.address;
-        config.gateway.bytes[3] = 254U;
-        ipv4_set_config(&config);
-    }
-
-    link_announce_ipv4(config.address);
-    for (int i = 0; i < 100; i++) {
-        link_poll();
-        time_delay_ms(10U);
-    }
-
-    if (!ipv4_is_zero(config.gateway)) {
-        eth_addr_t gw_mac;
-        (void)link_resolve_ipv4(config.gateway, &gw_mac, 3000U);
-    }
 
     ipv4_addr_t target;
     target.bytes[0] = AKOYA_CHAT_HOST_IP0;

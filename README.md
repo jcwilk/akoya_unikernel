@@ -51,8 +51,8 @@ Development workstation (Linux):
 ## Build and test
 
 ```bash
-make build    # cross-compile bootstrap kernel → build/kernel.elf, build/kernel.bin, build/transport-test.*, build/chat-regression-test.*
-make test     # build (if needed) + headless timed-gap multi-turn chat regression (≥3 turns, guest-side idle gaps)
+make build    # cross-compile bootstrap kernel → build/kernel.elf, build/kernel.bin, build/transport-test.*
+make test     # build (if needed) + idle-at-prompt gate on main kernel + transport-test suite
 make run      # build (if needed) + headful interactive macvtap QEMU session
 make iso          # BIOS/Legacy ISO → build/akoya-boot.iso (QEMU optical verify; not for USB dd on legacy BIOS)
 make verify-iso   # QEMU boot-from-ISO smoke
@@ -70,39 +70,37 @@ Automated verification **requires** the configured inference endpoint (`AKOYA_CH
 
 | Entry point | Purpose |
 |-------------|---------|
-| `make test` / `scripts/run-chat-regression-test.sh` | **Fast tier:** direct multiboot timed-gap chat regression (required for merge confidence) |
+| `make test` | **Fast tier:** idle-at-prompt scripted gate on main kernel (`scripts/run-idle-at-prompt-test.sh`) plus transport-test suite (`scripts/run-transport-test.sh`) |
 | `make verify-usb` / `scripts/verify-boot-usb.sh` | **Deploy tier:** BIOS/GRUB USB disk boot smoke (required for pre-flash sign-off alongside `make test`) |
 | `bash scripts/build-boot-iso.sh` / `make iso` | Package `build/akoya-boot.iso` (Multiboot1 + GRUB, BIOS/Legacy) |
 | `bash scripts/verify-boot-iso.sh` / `make verify-iso` | Boot packaged ISO under QEMU; pass on bootstrap + connectivity probe (no inference pre-flight) |
-| `bash scripts/run-chat-regression-test.sh` | Build (if needed), run `chat-regression-test` image headlessly, exit 0 on `timed-gap-chat-regression: ALL PASS` (default `make test` gate) |
-| `bash scripts/run-transport-test.sh` | Build (if needed), run `transport-test` image headlessly, exit 0 on `transport-test: ALL PASS` (complementary; does not satisfy chat health gate) |
+| `bash scripts/run-idle-at-prompt-test.sh` | Build (if needed), run main kernel headlessly with `scripts/fixtures/idle-at-prompt.akoya-script` (20s host delay at prompt); exit 0 on `chat_session=exit` without `chat failed:` lines |
+| `bash scripts/run-transport-test.sh` | Build (if needed), run `transport-test` image headlessly, exit 0 on `transport-test: ALL PASS` |
 | `bash scripts/run-qemu.sh --headless --logical kernel --script FILE` | Full-app scripted chat with output assertions (`*.akoya-script`) |
 | `bash scripts/run-qemu.sh --headless --logical kernel` | Multi-turn scripted chat via keyboard (`scripts/fixtures/multi-turn-pong.akoya-script` when no `--script`) |
-| `bash scripts/run-qemu.sh --headless --logical chat-regression-test` | Timed-gap chat regression image (guest-side idle gaps at input prompt) |
 | `bash scripts/run-qemu.sh --headless --boot-iso build/akoya-boot.iso` | ISO boot smoke (bootstrap + connectivity probe only) |
 | `bash scripts/run-qemu.sh --headless --image build/transport-test.elf` | Explicit transport-test image selection when both images exist |
 
-`make verify-iso` and `run-qemu.sh --boot-iso` **do not** require the inference endpoint to be reachable from the workstation. `make test`, timed-gap chat regression, and default headless kernel runs require inference pre-flight.
+`make verify-iso` and `run-qemu.sh --boot-iso` **do not** require the inference endpoint to be reachable from the workstation. `make test`, the idle-at-prompt gate, and default headless kernel runs require inference pre-flight.
 
-**Pre-flash sign-off** on a workstation with packaging tools installed requires **both** `make test` (fast direct-multiboot regression) **and** `make verify-usb` (deploy-faithful disk boot through BIOS → GRUB). Either tier alone is insufficient for flashing removable media to the Akoya.
+**Pre-flash sign-off** on a workstation with packaging tools installed requires **both** `make test` (idle-at-prompt + transport-test) **and** `make verify-usb` (deploy-faithful disk boot through BIOS → GRUB). Either tier alone is insufficient for flashing removable media to the Akoya.
 
-When multiple logical images exist under `build/`, omit `--image` / `--logical` and the runner errors with an actionable list—use `--logical kernel`, `--logical transport-test`, or `--logical chat-regression-test`.
+When multiple logical images exist under `build/`, omit `--image` / `--logical` and the runner errors with an actionable list—use `--logical kernel` or `--logical transport-test`.
 
 ### Transport-test image
 
-`scripts/build.sh` emits three logical boot images sharing the production network stack (`link`, IPv4, DHCP, TCP):
+`scripts/build.sh` emits two logical boot images sharing the production network stack (lwIP on RTL8139):
 
 - `build/kernel.bin` / `build/kernel.elf` — interactive chat unikernel
-- `build/chat-regression-test.bin` / `build/chat-regression-test.elf` — timed-gap multi-turn chat regression (production chat turn path, guest-side idle gaps)
 - `build/transport-test.bin` / `build/transport-test.elf` — non-interactive transport scenario suite
 
-The timed-gap chat regression image prints `turn N: PASS`/`FAIL` lines and a final aggregate `timed-gap-chat-regression: ALL PASS` or `timed-gap-chat-regression: FAILED`. It exercises the same async chat turn path as the main unikernel with event-scheduled idle gaps at the `> ` prompt between scheduled turns (default 5 s, three turns). **Passing transport-test alone does not satisfy the default multi-turn chat health gate** — use `make test` or `scripts/run-chat-regression-test.sh`.
+The idle-at-prompt gate (`scripts/fixtures/idle-at-prompt.akoya-script`) sends a short first message, waits **20 seconds** at the `> ` prompt on the host, sends a second message, and exits. The runner fails on any `chat failed:` line. **Passing transport-test alone does not satisfy the default chat health gate** — use `make test`.
 
 The transport-test image prints per-scenario `PASS`/`FAIL` lines and a final aggregate `transport-test: ALL PASS` or `transport-test: FAILED`. The refused-connection scenario targets port **19999** on the configured chat host (synthetic closed port, not inference downtime).
 
 ### Guest event runtime
 
-After console init the main kernel and timed-gap regression image enter a cooperative **event runtime** instead of blocking poll loops:
+After console init the main kernel enters a cooperative **event runtime** instead of blocking poll loops:
 
 - **Deferred device bottom-halves** (shared keyboard + RTL8139 shape): IRQ marks pending and masks the device line → bottom-half drains until hardware quiescent → unmask → one follow-up poll → clear pending.
 - **IRQ wakeups**: 8259 PIC + IDT; keyboard IRQ 1, wired NIC IRQ 11.

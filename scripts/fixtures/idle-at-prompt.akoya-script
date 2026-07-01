@@ -1,0 +1,16 @@
+# Idle-at-prompt gate: short first message, 20s host delay at prompt, second message, exit.
+# Requires inference endpoint reachable from workstation (pre-flight in runner).
+
+expect " reachable"
+
+type "hi"
+expect_line reply
+
+delay 20000
+
+type "ok"
+expect_line reply
+
+expect_not "chat failed:"
+
+type "quit"
